@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asteroid Field</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ============ MAIN MENU ============ -->
+    <section id="screen-menu" class="screen">
+      <div id="menu-stars" aria-hidden="true"></div>
+      <div class="menu-panel">
+        <h1 class="title">ASTEROID FIELD</h1>
+        <p class="tagline">The game of dodging asteroids!</p>
+
+        <div class="menu-buttons">
+          <button id="btn-play" class="menu-btn"></button>
+          <button id="btn-store" class="menu-btn"></button>
+          <button id="btn-customize" class="menu-btn"></button>
+          <button id="btn-achievements" class="menu-btn"></button>
+        </div>
+
+        <div class="menu-stats" id="menu-stats"></div>
+
+        <div class="tip-box" id="tip-box"></div>
+
+        <p class="how-to">
+          <strong>How to play:</strong>
+          Up / Down arrows (or W / S) to move &middot; Space to shoot.
+          Collect the dollar bill (+$20), the green circle (+1 bullet) and the battery (+1 life)!
+        </p>
+        <p class="small-note">Tip: hold the Up arrow and click Customize to reset your account.</p>
+      </div>
+    </section>
+
+    <!-- ============ GAME SCREEN ============ -->
+    <section id="screen-game" class="screen hidden">
+      <canvas id="game-canvas"></canvas>
+
+      <div id="hud" class="hud">
+        <div class="hud-left">
+          <div class="hud-row">
+            <span class="label">Lives</span>
+            <span id="hud-hearts" class="hearts"></span>
+          </div>
+          <div class="hud-row">
+            <span class="label">Bullets</span>
+            <span id="hud-ammo" class="ammo"></span>
+          </div>
+        </div>
+        <div class="hud-right">
+          <div class="hud-row"><span class="label">Score</span><span id="hud-score" class="score-digits"></span></div>
+          <div class="hud-row"><span class="label">Cash</span><span id="hud-money" class="money">$0</span></div>
+        </div>
+        <div class="hud-bottom">
+          <span id="hud-status" class="status-chip"></span>
+        </div>
+      </div>
+
+      <!-- Pause overlay -->
+      <div id="pause-overlay" class="overlay hidden">
+        <div class="panel">
+          <h2>Paused</h2>
+          <button id="btn-resume" class="big-btn">Resume</button>
+          <button id="btn-game-menu" class="big-btn">Main Menu</button>
+        </div>
+      </div>
+
+      <!-- Game over overlay -->
+      <div id="gameover-overlay" class="overlay hidden">
+        <div class="panel">
+          <h2 class="gameover-title">GAME OVER</h2>
+          <div id="gameover-stats" class="gameover-stats"></div>
+          <button id="btn-retry" class="big-btn">Play Again</button>
+          <button id="btn-over-menu" class="big-btn">Main Menu</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ STORE SCREEN ============ -->
+    <section id="screen-store" class="screen hidden">
+      <div id="store-stars" class="screen-stars" aria-hidden="true"></div>
+      <div class="screen-panel">
+        <header class="screen-header">
+          <button id="store-back" class="back-btn">&larr; Back</button>
+          <h2>STORE</h2>
+          <span id="store-money" class="money-big">$0</span>
+        </header>
+        <p class="screen-sub">Open a <strong>Drop</strong> to find a random skin inside: a ship, a shot, a trail or a background! Every drop costs a little more than the last.</p>
+        <div id="store-grid" class="store-grid"></div>
+        <div id="store-collection" class="store-collection"></div>
+      </div>
+    </section>
+
+    <!-- ============ CUSTOMIZE SCREEN ============ -->
+    <section id="screen-customize" class="screen hidden">
+      <div id="customize-stars" class="screen-stars" aria-hidden="true"></div>
+      <div class="screen-panel">
+        <header class="screen-header">
+          <button id="customize-back" class="back-btn">&larr; Back</button>
+          <h2>CUSTOMIZE</h2>
+        </header>
+        <p class="screen-sub">Press <strong>Space</strong> to jump to the next group of options. <strong>Click</strong> to choose a skin. Locked items are found by opening Drops in the Store!</p>
+        <div id="customize-fields" class="customize-fields"></div>
+      </div>
+    </section>
+
+    <!-- ============ ACHIEVEMENTS SCREEN ============ -->
+    <section id="screen-achievements" class="screen hidden">
+      <div id="achievements-stars" class="screen-stars" aria-hidden="true"></div>
+      <div class="screen-panel">
+        <header class="screen-header">
+          <button id="achievements-back" class="back-btn">&larr; Back</button>
+          <h2>ACHIEVEMENTS</h2>
+        </header>
+        <p class="screen-sub">Unlock these by playing!</p>
+        <div id="achievements-grid" class="ach-grid"></div>
+      </div>
+    </section>
+
+    <!-- Achievement toast -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- Fading screen effect (used for round fade-ins/outs) -->
+    <div id="fade" class="fade hidden"></div>
+
+    <!-- Dramatic chest-opening reveal -->
+    <div id="drop-reveal" class="reveal hidden"></div>
+  </div>
+
+  <!-- Plain scripts (no modules) so the game works even when opened straight from disk -->
+  <script src="js/data.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/assets.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/screens.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
