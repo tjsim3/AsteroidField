@@ -8,17 +8,31 @@ window.FX = (function () {
   const particles = [];   // {x,y,vx,vy,life,maxLife,size,color}
   const texts = [];       // floating text: {x,y,vy,life,text,color,size}
   let shake = 0;          // remaining screen-shake strength
+  let shakeEnabled = true;
+  let fxEnabled = true;
+
+  function setShake(on) {
+    shakeEnabled = on;
+    if (!on) shake = 0;
+  }
+
+  function setFx(on) {
+    fxEnabled = on;
+    if (!on) particles.length = 0;
+  }
 
   function addShake(amount) {
+    if (!shakeEnabled) return;
     shake = Math.min(shake + amount, 24);
   }
 
   function getShake() {
-    return shake;
+    return shakeEnabled ? shake : 0;
   }
 
   /* Spawn a burst of square/round particles. */
   function burst(x, y, count, colors, speedMin, speedMax, sizeMin, sizeMax) {
+    if (!fxEnabled) return;
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = speedMin + Math.random() * (speedMax - speedMin);
@@ -38,6 +52,7 @@ window.FX = (function () {
 
   /* A star-shaped sparkle (uses the explosion image if available). */
   function explosion(x, y) {
+    if (!fxEnabled) return;
     burst(x, y, 26, ["#ffe93a", "#ff9300", "#ffffff", "#ff4d4d", "#e0ff00"],
       40, 260, 3, 7);
     // Bigger debris chunks
@@ -84,14 +99,16 @@ window.FX = (function () {
 
   /* Advance every effect's lifetime. */
   function update(dt) {
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.vx *= (1 - 1.6 * dt);
-      p.vy *= (1 - 1.6 * dt);
-      p.life -= dt;
-      if (p.life <= 0) particles.splice(i, 1);
+    if (fxEnabled) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vx *= (1 - 1.6 * dt);
+        p.vy *= (1 - 1.6 * dt);
+        p.life -= dt;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
     }
     for (let i = texts.length - 1; i >= 0; i--) {
       const t = texts[i];
@@ -105,14 +122,16 @@ window.FX = (function () {
 
   /* Draw all particles and floating text onto the context. */
   function draw(ctx) {
-    for (const p of particles) {
-      ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
-      ctx.fillStyle = p.color;
-      // square bits read better on screen than circles
-      const s = p.size * (0.5 + 0.5 * p.life / p.maxLife);
-      ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+    if (fxEnabled) {
+      for (const p of particles) {
+        ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+        ctx.fillStyle = p.color;
+        // square bits read better on screen than circles
+        const s = p.size * (0.5 + 0.5 * p.life / p.maxLife);
+        ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+      }
+      ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
 
     for (const t of texts) {
       const alpha = Math.max(0, t.life / t.maxLife);
@@ -135,6 +154,6 @@ window.FX = (function () {
 
   return {
     burst, explosion, healFx, pickupFx, muzzleFlash, floatText,
-    update, draw, clear, addShake, getShake
+    update, draw, clear, addShake, getShake, setShake, setFx
   };
 })();

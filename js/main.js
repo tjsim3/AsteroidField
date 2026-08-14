@@ -92,6 +92,7 @@ window.INPUT = { keys: {} };
   function setMenuButtonImages() {
     const mapping = {
       "btn-play": DATA.menuButtons.play,
+      "btn-play2": DATA.menuButtons.multiplayer,
       "btn-store": DATA.menuButtons.store,
       "btn-customize": DATA.menuButtons.customize,
       "btn-achievements": DATA.menuButtons.achievements
@@ -107,7 +108,19 @@ window.INPUT = { keys: {} };
   $("btn-play").addEventListener("click", function () {
     fadeTransition(function () {
       showScreen("screen-game");
-      Game.startRun();
+      Game.startRun({});
+    });
+  });
+
+  $("btn-play2").addEventListener("click", function () {
+    UI.buildP2Setup();
+    showScreen("screen-p2");
+  });
+
+  $("btn-p2-start").addEventListener("click", function () {
+    fadeTransition(function () {
+      showScreen("screen-game");
+      Game.startRun({ two: true, cfg: UI.getP2Config() });
     });
   });
 
@@ -136,9 +149,24 @@ window.INPUT = { keys: {} };
     showScreen("screen-achievements");
   });
 
+  $("btn-settings").addEventListener("click", function () {
+    UI.buildSettings();
+    showScreen("screen-settings");
+  });
+
   $("store-back").addEventListener("click", goToMenu);
   $("customize-back").addEventListener("click", goToMenu);
   $("achievements-back").addEventListener("click", goToMenu);
+  $("settings-back").addEventListener("click", goToMenu);
+
+  // Settings toggles (shake / special effects / sound)
+  ["shake", "fx", "sound"].forEach(function (key) {
+    const el = $("set-" + key);
+    if (!el) return;
+    el.addEventListener("change", function () {
+      UI.toggleSetting(key, el.checked);
+    });
+  });
 
   $("btn-resume").addEventListener("click", function () {
     Game.togglePause();
@@ -146,6 +174,7 @@ window.INPUT = { keys: {} };
 
   $("btn-game-menu").addEventListener("click", goToMenu);
   $("btn-over-menu").addEventListener("click", goToMenu);
+  $("p2-back").addEventListener("click", goToMenu);
 
   $("btn-retry").addEventListener("click", function () {
     fadeTransition(function () {
@@ -183,11 +212,14 @@ window.INPUT = { keys: {} };
 
   /* ---------------- boot ---------------- */
   Game.init();
+  UI.applySettings(SAVE.load().settings);
   setMenuButtonImages();
   scatterStars($("menu-stars"));
   scatterStars($("store-stars"));
   scatterStars($("customize-stars"));
   scatterStars($("achievements-stars"));
+  scatterStars($("p2-stars"));
+  scatterStars($("settings-stars"));
 
   // preload every sprite in the background (the menu shows right away);
   // when it's done, refresh the menu buttons and stats

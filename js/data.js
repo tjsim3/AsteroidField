@@ -12,6 +12,7 @@ window.DATA = (function () {
     startAmmo: 12,         // bullets at the start
     maxAmmo: 24,           // bullet cap
     fireCooldown: 0.16,    // seconds between shots (hold Space to auto-fire)
+    slowMoDuration: 18,    // seconds the Slow-Mo power-up lasts (3x the original 6)
     playerSpeed: 520,      // up/down speed (px/s)
     bulletPierce: 2,       // a bullet can punch through this many EXTRA asteroids
     moneyPerBill: 20,      // value of the dollar bill drop
@@ -157,6 +158,7 @@ window.DATA = (function () {
   /* ---------- Main menu button images ---------- */
   const menuButtons = {
     play: "MenuButtons/costume1.svg",
+    multiplayer: "MenuButtons/costume6.svg",
     store: "MenuButtons/costume2.svg",
     customize: "MenuButtons/costume3.svg",
     achievements: "MenuButtons/costume5.svg"

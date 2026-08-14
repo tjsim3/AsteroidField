@@ -35,7 +35,12 @@ window.SAVE = (function () {
         bestTime: 0,             // longest single run, in seconds
         totalTime: 0             // total playing time, in seconds
       },
-      achievements: {}           // { id: true } when unlocked
+      achievements: {},          // { id: true } when unlocked
+      settings: {
+        shake: true,             // screen shake on impacts
+        fx: true,                // particle / special effects
+        sound: true              // sound effects (no audio yet)
+      }
     };
   }
 

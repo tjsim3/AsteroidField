@@ -10,6 +10,7 @@ window.UI = (function () {
 
   let toastTimer = null;
   let freeDrops = false;   // cheat mode: opening drops costs nothing
+  let p2Cfg = null;        // per-player skins chosen on the 2P setup screen
 
   /* ---------------- Main menu props ---------------- */
   function updateMenuStats() {
@@ -191,10 +192,15 @@ window.UI = (function () {
         const chip = document.createElement("span");
         if (isOwned(s, group.cat, item.id)) {
           chip.className = "coll-chip";
-          const img = document.createElement("img");
-          img.src = item.src;
-          img.alt = item.name;
-          chip.appendChild(img);
+          if (group.cat === "background") {
+            // Backgrounds are procedural (drawn), not image files.
+            chip.appendChild(bgCanvas(item, 34));
+          } else {
+            const img = document.createElement("img");
+            img.src = item.src;
+            img.alt = item.name;
+            chip.appendChild(img);
+          }
         } else {
           chip.className = "coll-chip locked";
           chip.textContent = "?";
@@ -262,10 +268,15 @@ window.UI = (function () {
 
       const item = document.createElement("div");
       item.className = "reveal-item";
-      const img = document.createElement("img");
-      img.src = pick.item.src;
-      img.alt = pick.item.name;
-      item.appendChild(img);
+      if (pick.cat === "background") {
+        // Procedural backgrounds are drawn onto a canvas, not an image file.
+        item.appendChild(bgCanvas(pick.item, 130));
+      } else {
+        const img = document.createElement("img");
+        img.src = pick.item.src;
+        img.alt = pick.item.name;
+        item.appendChild(img);
+      }
       panel.insertBefore(item, hint);
 
       const name = document.createElement("div");
@@ -369,6 +380,7 @@ window.UI = (function () {
         const cv = document.createElement("canvas");
         cv.width = 74;
         cv.height = 74;
+        cv._bg = bg;
         drawBackgroundPreview(cv, bg);
         btn.appendChild(cv);
         btn.title = bg.name;
@@ -432,29 +444,210 @@ window.UI = (function () {
     buildCustomize();
   }
 
+  /* A ready-made canvas thumbnail of a procedural background. */
+  function bgCanvas(bg, size) {
+    const cv = document.createElement("canvas");
+    cv.width = size;
+    cv.height = size;
+    cv._bg = bg;
+    drawBackgroundPreview(cv, bg);
+    return cv;
+  }
+
   /* Draw a little thumbnail of a moving background onto a canvas. */
   function drawBackgroundPreview(cv, bg) {
     const ctx = cv.getContext("2d");
+    const size = cv.width;
     const t = Date.now() / 1000;
-    const grad = ctx.createLinearGradient(0, 0, 0, 74);
+    const grad = ctx.createLinearGradient(0, 0, 0, size);
     grad.addColorStop(0, bg.skyTop);
     grad.addColorStop(1, bg.skyBottom);
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 74, 74);
+    ctx.fillRect(0, 0, size, size);
 
     bg.stars.forEach(function (layer, li) {
       for (let i = 0; i < layer.count; i++) {
-        const sx = (Math.sin(i * 997.7) * 0.5 + 0.5) * 74;
-        const sy = (Math.cos(i * 613.1) * 0.5 + 0.5) * 74;
+        const sx = (Math.sin(i * 997.7) * 0.5 + 0.5) * size;
+        const sy = (Math.cos(i * 613.1) * 0.5 + 0.5) * size;
         const sm = li + 1;
         // star drifts slowly to the left
-        const x = ((sx - t * (20 + 30 * li) * 1.2 * sm) % 74 + 74) % 74;
+        const x = ((sx - t * (20 + 30 * li) * 1.2 * sm) % size + size) % size;
         ctx.fillStyle = layer.colors[i % layer.colors.length];
         ctx.globalAlpha = 0.5 + 0.5 * Math.sin(sy + t * (1 + li));
         ctx.fillRect(x, sy, 1 + layer.size[0] / 2, 1 + layer.size[0] / 2);
       }
     });
     ctx.globalAlpha = 1;
+  }
+
+  /* ---------------- Two-player setup ---------------- */
+  /* The skin categories each player can pick from (unlocked items only). */
+  const P2_FIELDS = [
+    { key: "ship",   cat: "ship",   defs: DATA.ships,   name: "Ship" },
+    { key: "boost",  cat: "boost",  defs: DATA.trails,  name: "Boost Trail" },
+    { key: "bullet", cat: "bullet", defs: DATA.bullets, name: "Shot" }
+  ];
+
+  /* Which owned item to suggest for Player 2 - the first one that differs
+     from Player 1's pick, so the two ships don't look identical. */
+  function firstDifferent(s, cat, fromId) {
+    const defs = P2_FIELDS.find(function (f) { return f.cat === cat; }).defs;
+    const diff = (s.owned[cat] || []).find(function (id) {
+      return id !== fromId && defs.some(function (x) { return x.id === id; });
+    });
+    return diff || fromId;
+  }
+
+  function initP2Cfg(s) {
+    return {
+      p1: {
+        ship: s.equipment.ship,
+        boost: s.equipment.boost,
+        bullet: s.equipment.bullet
+      },
+      p2: {
+        ship: firstDifferent(s, "ship", s.equipment.ship),
+        boost: firstDifferent(s, "boost", s.equipment.boost),
+        bullet: firstDifferent(s, "bullet", s.equipment.bullet)
+      }
+    };
+  }
+
+  /* Build the two player cards (one per player, three pickers each). */
+  function buildP2Setup() {
+    const wrap = $("p2-setup");
+    if (!wrap) return;
+    const s = save.load();
+    if (!p2Cfg) p2Cfg = initP2Cfg(s);
+
+    wrap.innerHTML = "";
+
+    ["p1", "p2"].forEach(function (who) {
+      const card = document.createElement("div");
+      card.className = "p2-card " + who;
+      const cfg = p2Cfg[who];
+      const color = who === "p1" ? "#6ea8ff" : "#ff6ac1";
+      const controls = who === "p1" ? "W/S + Shift" : "Arrows + Space";
+
+      const head = document.createElement("div");
+      head.className = "p2-head";
+      head.innerHTML =
+        '<span class="p2-dot" style="background:' + color + '"></span>' +
+        '<span class="p2-title">' + (who === "p1" ? "PLAYER 1" : "PLAYER 2") + '</span>' +
+        '<span class="p2-controls">' + controls + '</span>';
+      card.appendChild(head);
+
+      P2_FIELDS.forEach(function (field) {
+        const box = document.createElement("div");
+        box.className = "p2-picker";
+
+        const lbl = document.createElement("div");
+        lbl.className = "p2-label";
+        lbl.textContent = field.name;
+        box.appendChild(lbl);
+
+        const thumbs = document.createElement("div");
+        thumbs.className = "p2-thumbs";
+        (s.owned[field.cat] || []).forEach(function (id) {
+          const def = field.defs.find(function (x) { return x.id === id; });
+          if (!def) return;
+          const thumb = document.createElement("div");
+          thumb.className = "p2-thumb" + (cfg[field.key] === id ? " selected" : "");
+          thumb.title = def.name;
+          thumb.dataset.pfield = field.key;
+          thumb.dataset.pid = id;
+          const img = document.createElement("img");
+          img.src = def.src;
+          img.alt = def.name;
+          thumb.appendChild(img);
+          thumb.addEventListener("click", function () {
+            P2_FOCUS[who] = Array.prototype.indexOf.call(
+              thumb.closest(".p2-card").querySelectorAll(".p2-thumb"), thumb
+            );
+            cfg[field.key] = id;
+            buildP2Setup();
+          });
+          thumbs.appendChild(thumb);
+        });
+        box.appendChild(thumbs);
+        card.appendChild(box);
+      });
+
+      wrap.appendChild(card);
+    });
+
+    // Park each player's keyboard cursor on what they have equipped.
+    p2SyncFocus();
+  }
+
+  /* Per-player keyboard costume picking: P1 uses W/S + Shift, P2 uses the
+     arrow keys + Space. Each card is one long row of thumbnails that wraps. */
+  const P2_FOCUS = { p1: -1, p2: -1 };   // -1 = "start on the equipped costume"
+
+  function p2Thumbs(who) {
+    const card = document.querySelector(".p2-card." + who);
+    return card ? Array.prototype.slice.call(card.querySelectorAll(".p2-thumb")) : [];
+  }
+
+  /* Validate each player's cursor and draw its highlight ring. */
+  function p2SyncFocus() {
+    ["p1", "p2"].forEach(function (who) {
+      const thumbs = p2Thumbs(who);
+      if (!thumbs.length) return;
+      let idx = P2_FOCUS[who];
+      if (idx < 0) {
+        idx = -1;
+        thumbs.forEach(function (t, i) {
+          if (p2Cfg[who][t.dataset.pfield] === t.dataset.pid) idx = i;
+        });
+        if (idx < 0) idx = 0;
+        P2_FOCUS[who] = idx;
+      } else {
+        P2_FOCUS[who] = Math.max(0, Math.min(idx, thumbs.length - 1));
+      }
+      thumbs.forEach(function (t) { t.classList.remove("focused"); });
+      thumbs[P2_FOCUS[who]].classList.add("focused");
+    });
+  }
+
+  function p2Move(who, dir) {
+    const thumbs = p2Thumbs(who);
+    if (!thumbs.length) return;
+    if (P2_FOCUS[who] < 0) P2_FOCUS[who] = 0;
+    P2_FOCUS[who] = (P2_FOCUS[who] + dir + thumbs.length) % thumbs.length;
+    p2SyncFocus();
+  }
+
+  function p2Pick(who) {
+    const thumbs = p2Thumbs(who);
+    if (!thumbs.length) return;
+    if (P2_FOCUS[who] < 0) p2SyncFocus();
+    const t = thumbs[P2_FOCUS[who]];
+    if (!t) return;
+    p2Cfg[who][t.dataset.pfield] = t.dataset.pid;
+    buildP2Setup();
+  }
+
+  /* Wire up keyboard costume picking while the 2P screen is open. */
+  document.addEventListener("keydown", function (e) {
+    const screen = $("screen-p2");
+    if (!screen || screen.classList.contains("hidden") || e.repeat) return;
+    const k = (e.key || "").toLowerCase();
+    if (k === "w") { p2Move("p1", -1); e.preventDefault(); return; }
+    if (k === "s") { p2Move("p1", 1); e.preventDefault(); return; }
+    if (k === "shift") { p2Pick("p1"); e.preventDefault(); return; }
+    if (k === "arrowup") { p2Move("p2", -1); e.preventDefault(); return; }
+    if (k === "arrowdown") { p2Move("p2", 1); e.preventDefault(); return; }
+    if (k === " ") { p2Pick("p2"); e.preventDefault(); }
+  });
+
+  /* The full skin config for the run (falls back to equipped gear in game.js). */
+  function getP2Config() {
+    if (!p2Cfg) {
+      const s = save.load();
+      p2Cfg = initP2Cfg(s);
+    }
+    return p2Cfg;
   }
 
   /* ---------------- helpers ---------------- */
@@ -473,9 +666,50 @@ window.UI = (function () {
     buildAchievements();
   }
 
+    /* ---------------- Settings ---------------- */
+  function applySettings(s) {
+    // FX is loaded before this module, so its toggles are safe here.
+    FX.setShake(s.shake !== false);
+    FX.setFx(s.fx !== false);
+  }
+
+  function buildSettings() {
+    const s = save.load();
+    applySettings(s);
+    const shake = $("set-shake");
+    const fx = $("set-fx");
+    const sound = $("set-sound");
+    if (shake) shake.checked = s.settings.shake !== false;
+    if (fx) fx.checked = s.settings.fx !== false;
+    if (sound) sound.checked = s.settings.sound !== false;
+  }
+
+  function toggleSetting(key, on) {
+    const s = save.load();
+    s.settings[key] = on;
+    save.save();
+    applySettings(s);
+  }
+
+  /* Keep every visible background thumbnail drifting every frame.
+     Canvases hidden inside a closed overlay report offsetWidth 0,
+     so they're skipped until they become visible again. */
+  function tickBGPreviews() {
+    document.querySelectorAll(".option-grid canvas, .coll-chips canvas, .reveal-item canvas")
+      .forEach(function (cv) {
+        if (cv._bg && cv.offsetWidth > 0) {
+          drawBackgroundPreview(cv, cv._bg);
+        }
+      });
+    requestAnimationFrame(tickBGPreviews);
+  }
+  requestAnimationFrame(tickBGPreviews);
+
   return {
     updateMenuStats, notify, setTip, buildStore, buildCustomize,
     buildAchievements, nextField, setActiveField, unlock, updateStoreMoney, fmt,
+    buildP2Setup, getP2Config,
+    buildSettings, toggleSetting, applySettings,
     setFreeDrops: function (on) { freeDrops = on; buildStore(); },
     isFreeDrops: function () { return freeDrops; }
   };

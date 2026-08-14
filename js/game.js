@@ -21,10 +21,23 @@ window.Game = (function () {
   let runTime = 0;
   let score = 0;
   let runCash = 0;            // money collected this run
-  let damageTaken = 0;
+
+  // per-run breakdown for the game-over screen
+  let runStats = {
+    bulletsFired: 0,
+    asteroidsDestroyed: 0,
+    asteroidsByBullets: 0,
+    cashBills: 0,        // $ from dollar-bill pickups
+    cashWrecks: 0,       // $ from destroyed asteroids
+    cashBonus: 0,        // $ from full-health pickups
+    scoreSurvival: 0,
+    scoreAsteroids: 0,
+    pickups: { money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0 }
+  };
 
   // ---------- entities ----------
-  let player = null;
+  let players = [];
+  let twoPlayer = false;   // true during a 2-player run (throws extra rocks)
   let bullets = [];
   let asteroids = [];
   let powerups = [];
@@ -32,15 +45,10 @@ window.Game = (function () {
   // ---------- timers / status ----------
   let slowT = 0;
   let shrinkT = 0;
-  let invulnT = 0;
-  let fireCd = 0;
   let spawnCd = 1;
   let powerupCd = 2.5;
-  let lastAmmo = -1;      // cached so the HUD only re-renders on change
   let lastScore = -1;
-
-  // player trail ghosts (always visible - makes the ship look like it's moving)
-  let trail = [];
+  let lastOpts = {};       // the options the current run was started with
 
   // ---------- background ----------
   let bgStars = [];
@@ -49,6 +57,14 @@ window.Game = (function () {
   // ---------- input ----------
   function key(keyName) {
     return INPUT.keys[keyName] === true;
+  }
+
+  // true if any of the given key names is held down
+  function keysDown(names) {
+    for (let i = 0; i < names.length; i++) {
+      if (INPUT.keys[names[i]] === true) return true;
+    }
+    return false;
   }
 
   // =====================================================
@@ -148,35 +164,96 @@ window.Game = (function () {
   // =====================================================
   //  START / STOP
   // =====================================================
-  function startRun() {
-    player = {
-      x: Math.max(130, W * 0.16),
-      y: H / 2,
-      r: 20,
-      maxHealth: G.maxHealth,
-      health: G.maxHealth,
-      ammo: G.startAmmo,
-      pitch: 0,          // eased ship rotation in degrees (nose up = negative)
-      wobble: 0,         // extra chaotic rotation after a hit
-      wobbleT: 0,        // seconds of wobble left
-      knockVy: 0,        // vertical knockback impulse after a hit
-      knockT: 0          // seconds of knockback left
+  function startRun(opts) {
+    if (opts === undefined) opts = lastOpts;   // Play Again keeps the same mode
+    lastOpts = opts || {};
+    twoPlayer = !!opts.two;
+    const save = SAVE.load();
+
+    // skin config picked on the 2P setup screen (falls back to equipped gear)
+    const cfg = opts.cfg || {};
+    const p1c = cfg.p1 || {};
+    const p2c = cfg.p2 || {};
+
+    // Never let a locked skin sneak in - only unlocked skins are allowed.
+    const resolveSkin = function (cat, id) {
+      if (id && (save.owned[cat] || []).indexOf(id) > -1) return id;
+      return save.equipment[cat];
     };
+
+    const mkPlayer = function (ship, boost, bullet, ctrl, name, color, y) {
+      return {
+        x: Math.max(130, W * 0.16),
+        y: y,
+        r: 20,
+        maxHealth: G.maxHealth,
+        health: G.maxHealth,
+        ammo: G.startAmmo,
+        pitch: 0,          // eased ship rotation in degrees (nose up = negative)
+        wobble: 0,         // extra chaotic rotation after a hit
+        wobbleT: 0,        // seconds of wobble left
+        knockVy: 0,        // vertical knockback impulse after a hit
+        knockT: 0,         // seconds of knockback left
+        invulnT: 0,        // seconds of invulnerability left
+        fireCd: 0,         // seconds before the next shot is allowed
+        trail: [],         // ghost clones streaming off the back of the ship
+        ctrl: ctrl,        // which keys move / fire this player
+        ship: ship,        // this player's ship skin
+        boost: boost,      // this player's boost trail skin
+        bullet: bullet,    // this player's shot skin
+        name: name,        // short tag shown above the ship in 2P
+        color: color,      // color of the tag + HUD label
+        damageTaken: 0,    // how many times this player got hit (for the end screen)
+        diedAt: null,      // runTime (seconds) when this player went down, null if alive
+        bulletsFired: 0    // for the end screen
+      };
+    };
+
+    // P1 lives on the left side of the keyboard (W/S + Shift).
+    // In solo they can also use the arrow keys; in 2P the keys are split.
+    const p1Up = twoPlayer ? ["w"] : ["w", "arrowup"];
+    const p1Down = twoPlayer ? ["s"] : ["s", "arrowdown"];
+    const p1Shoot = twoPlayer ? ["shift"] : ["shift", " "];
+    const p1Ship = resolveSkin("ship", p1c.ship);
+    const p1Boost = resolveSkin("boost", p1c.boost);
+    const p1Bullet = resolveSkin("bullet", p1c.bullet);
+
+    players = [
+      mkPlayer(p1Ship, p1Boost, p1Bullet, { up: p1Up, down: p1Down, shoot: p1Shoot }, "P1", "#6ea8ff", H * 0.35)
+    ];
+    if (twoPlayer) {
+      players.push(
+        mkPlayer(
+          resolveSkin("ship", p2c.ship),
+          resolveSkin("boost", p2c.boost),
+          resolveSkin("bullet", p2c.bullet),
+          { up: ["arrowup"], down: ["arrowdown"], shoot: [" "] },
+          "P2", "#ff6ac1", H * 0.62
+        )
+      );
+    }
 
     bullets = [];
     asteroids = [];
     powerups = [];
-    trail = [];
 
     runTime = 0;
     score = 0;
     runCash = 0;
-    damageTaken = 0;
+    runStats = {
+      bulletsFired: 0,
+      asteroidsDestroyed: 0,
+      asteroidsByBullets: 0,
+      cashBills: 0,
+      cashWrecks: 0,
+      cashBonus: 0,
+      scoreSurvival: 0,
+      scoreAsteroids: 0,
+      pickups: { money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0 }
+    };
 
     slowT = 0;
     shrinkT = 0;
-    invulnT = 0;
-    fireCd = 0;
     spawnCd = 1.2;
     powerupCd = 2.5;
 
@@ -230,29 +307,32 @@ window.Game = (function () {
   // =====================================================
   //  UPDATE
   // =====================================================
+  // A player with 0 health is "down". The run only ends when EVERYONE is down.
+  function allPlayersDown() {
+    for (let pi = 0; pi < players.length; pi++) {
+      if (players[pi].health > 0) return false;
+    }
+    return true;
+  }
+
   function update(dt) {
-    // Always validate the player's health - if it is ever 0 or below,
-    // the run must end right now (no matter how it got there).
-    if (!player || player.health <= 0) {
+    // Always validate - if every ship is out, the run must end right now.
+    if (allPlayersDown()) {
       gameOver();
       return;
     }
 
     runTime += dt;
 
-    // ---- timers ----
+    // ---- timers (per-player ones tick inside the movement loop) ----
     slowT = Math.max(0, slowT - dt);
     shrinkT = Math.max(0, shrinkT - dt);
-    invulnT = Math.max(0, invulnT - dt);
-    fireCd = Math.max(0, fireCd - dt);
 
     // ---- score over time ----
     score += G.scorePerSecond * dt;
+    runStats.scoreSurvival += G.scorePerSecond * dt;
 
-    // ---- moving the player ----
-    const up = key("arrowup") || key("w");
-    const down = key("arrowdown") || key("s");
-    const shoot = key(" ");
+    // ---- moving the players ----
     const pauseKey = key("escape");
 
     if (pauseKey && state === STATE.PLAYING) {
@@ -261,65 +341,81 @@ window.Game = (function () {
     }
 
     const speed = G.playerSpeed;
-    if (up) player.y -= speed * dt;
-    if (down) player.y += speed * dt;
 
-    // knockback from a hit - an impulse that eases out
-    if (player.knockT > 0) {
-      player.knockT -= dt;
-      player.y += player.knockVy * dt;
-      player.knockVy *= Math.exp(-dt * 6);
-    }
-    player.y = Math.max(player.r, Math.min(H - player.r, player.y));
+    for (let pi = 0; pi < players.length; pi++) {
+      const p = players[pi];
+      if (p.health <= 0) continue;   // downed ships don't move, shoot or glow
 
-    // ---- ship pitch ----
-    // The ship tilts ~30deg toward the held direction; the angle eases to the
-    // target so the transition reads as smooth instead of a snap.
-    const pitchTarget = (up ? -30 : 0) + (down ? 30 : 0);
-    player.pitch += (pitchTarget - player.pitch) * (1 - Math.exp(-dt / 0.055));
+      const up = keysDown(p.ctrl.up);
+      const down = keysDown(p.ctrl.down);
+      const shoot = keysDown(p.ctrl.shoot);
 
-    // ---- hit wobble ----
-    // After a hit the rotation bobs back and forth, decaying to calm.
-    if (player.wobbleT > 0) {
-      player.wobbleT -= dt;
-      player.wobble = Math.sin(runTime * 30) * 55 * Math.max(0, player.wobbleT) / 0.5;
-    } else {
-      player.wobble = 0;
-    }
+      if (up) p.y -= speed * dt;
+      if (down) p.y += speed * dt;
 
-    // ---- player trail (always on) ----
-    // Ghost clones stream off the back of the ship, angled opposite the nose.
-    const butt = ((180 + player.pitch + player.wobble) * Math.PI) / 180;
-    const trailSpeed = 620;
-    trail.push({
-      x: player.x + Math.cos(butt) * 22,
-      y: player.y + Math.sin(butt) * 22,
-      vx: Math.cos(butt) * trailSpeed,
-      vy: Math.sin(butt) * trailSpeed,
-      rot: (butt * 180) / Math.PI
-    });
-    if (trail.length > 18) trail.shift();
+      // knockback from a hit - an impulse that eases out
+      if (p.knockT > 0) {
+        p.knockT -= dt;
+        p.y += p.knockVy * dt;
+        p.knockVy *= Math.exp(-dt * 6);
+      }
+      p.y = Math.max(p.r, Math.min(H - p.r, p.y));
 
-    const trailMul = (slowT > 0 ? 0.35 : 1);
-    for (let i = trail.length - 1; i >= 0; i--) {
-      trail[i].x += trail[i].vx * trailMul * dt;
-      trail[i].y += trail[i].vy * trailMul * dt;
-      if (trail[i].x < -40 || trail[i].y < -60 || trail[i].y > H + 60) trail.splice(i, 1);
-    }
+      // per-player status timers
+      p.invulnT = Math.max(0, p.invulnT - dt);
+      p.fireCd = Math.max(0, p.fireCd - dt);
 
-    // ---- shooting ----
-    if (shoot && player.ammo > 0 && fireCd <= 0) {
-      fire();
+      // ---- ship pitch ----
+      // The ship tilts ~30deg toward the held direction; the angle eases to the
+      // target so the transition reads as smooth instead of a snap.
+      const pitchTarget = (up ? -30 : 0) + (down ? 30 : 0);
+      p.pitch += (pitchTarget - p.pitch) * (1 - Math.exp(-dt / 0.055));
+
+      // ---- hit wobble ----
+      // After a hit the rotation bobs back and forth, decaying to calm.
+      if (p.wobbleT > 0) {
+        p.wobbleT -= dt;
+        p.wobble = Math.sin(runTime * 30) * 55 * Math.max(0, p.wobbleT) / 0.5;
+      } else {
+        p.wobble = 0;
+      }
+
+      // ---- player trail (always on) ----
+      // Ghost clones stream off the back of the ship, angled opposite the nose.
+      const butt = ((180 + p.pitch + p.wobble) * Math.PI) / 180;
+      const trailSpeed = 620;
+      p.trail.push({
+        x: p.x + Math.cos(butt) * 22,
+        y: p.y + Math.sin(butt) * 22,
+        vx: Math.cos(butt) * trailSpeed,
+        vy: Math.sin(butt) * trailSpeed,
+        rot: (butt * 180) / Math.PI
+      });
+      if (p.trail.length > 18) p.trail.shift();
+
+      const trailMul = (slowT > 0 ? 0.35 : 1);
+      for (let i = p.trail.length - 1; i >= 0; i--) {
+        p.trail[i].x += p.trail[i].vx * trailMul * dt;
+        p.trail[i].y += p.trail[i].vy * trailMul * dt;
+        if (p.trail[i].x < -40 || p.trail[i].y < -60 || p.trail[i].y > H + 60) p.trail.splice(i, 1);
+      }
+
+      // ---- shooting ----
+      if (shoot && p.ammo > 0 && p.fireCd <= 0) {
+        fire(p);
+      }
     }
 
     // ---- spawning ----
+    // Two players put a lot more lead in the air, so throw extra rocks at them.
     spawnCd -= dt;
     if (spawnCd <= 0) {
       spawnAsteroid();
       // sometimes a burst of two, so the action feels fast
-      if (Math.random() < 0.35) spawnAsteroid();
+      if (Math.random() < (twoPlayer ? 0.55 : 0.35)) spawnAsteroid();
+      if (twoPlayer && Math.random() < 0.2) spawnAsteroid();
       const difficulty = Math.max(0.3, 1.0 - runTime * 0.012);
-      spawnCd = difficulty * (0.55 + Math.random() * 0.5);
+      spawnCd = difficulty * (0.55 + Math.random() * 0.5) * (twoPlayer ? 0.55 : 1);
     }
 
     powerupCd -= dt;
@@ -356,9 +452,14 @@ window.Game = (function () {
         continue;
       }
 
-      // player collision (only when not invulnerable)
-      if (invulnT <= 0 && circleHit(player.x, player.y, playerRadius(), a.x, a.y, a.r)) {
-        hitPlayer(i);
+      // player collision (only when not invulnerable) - hits ANY alive ship
+      for (let pi = 0; pi < players.length; pi++) {
+        const pl = players[pi];
+        if (pl.health <= 0) continue;   // already down - the wreck can't be hit again
+        if (pl.invulnT <= 0 && circleHit(pl.x, pl.y, playerRadius(pl), a.x, a.y, a.r)) {
+          hitPlayer(i, pl);
+          break;   // the rock is gone, stop checking the other ships
+        }
       }
     }
 
@@ -373,9 +474,14 @@ window.Game = (function () {
         powerups.splice(i, 1);
         continue;
       }
-      if (circleHit(player.x, player.y, playerRadius() + 10, p.x, p.y, 22)) {
-        collectPowerup(p);
-        powerups.splice(i, 1);
+      for (let pi = 0; pi < players.length; pi++) {
+        const pl = players[pi];
+        if (pl.health <= 0) continue;   // only alive ships can grab drops
+        if (circleHit(pl.x, pl.y, playerRadius(pl) + 10, p.x, p.y, 22)) {
+          collectPowerup(p, pl);
+          powerups.splice(i, 1);
+          break;
+        }
       }
     }
 
@@ -408,19 +514,22 @@ window.Game = (function () {
   // =====================================================
   //  FIRING
   // =====================================================
-  function fire() {
-    player.ammo--;
-    fireCd = G.fireCooldown;
+  function fire(p) {
+    p.ammo--;
+    p.fireCd = G.fireCooldown;
+    p.bulletsFired++;
+    runStats.bulletsFired++;
 
     // Each skin is already drawn as a pair of bullets, so one shot is enough.
     bullets.push({
-      x: player.x + 26,
-      y: player.y,
+      x: p.x + 26,
+      y: p.y,
       vx: 1050,
-      r: 9,
-      hits: 0
+      r: 24,
+      hits: 0,
+      skin: p.bullet   // this player's chosen shot skin
     });
-    FX.muzzleFlash(player.x + 24, player.y);
+    FX.muzzleFlash(p.x + 24, p.y);
   }
 
   // =====================================================
@@ -464,7 +573,13 @@ window.Game = (function () {
     if (idx > -1) asteroids.splice(idx, 1);
 
     score += a.size.score;
-    if (!fromClear) runCash += a.size.money;
+    runStats.asteroidsDestroyed++;
+    runStats.scoreAsteroids += a.size.score;
+    if (!fromClear) {
+      runCash += a.size.money;
+      runStats.cashWrecks += a.size.money;
+      runStats.asteroidsByBullets++;
+    }
 
     // explosions everywhere
     FX.explosion(a.x, a.y);
@@ -500,30 +615,31 @@ window.Game = (function () {
   // =====================================================
   //  HITTING THE PLAYER
   // =====================================================
-  function playerRadius() {
-    return player.r * (shrinkT > 0 ? 0.58 : 1);
+  function playerRadius(p) {
+    return p.r * (shrinkT > 0 ? 0.58 : 1);
   }
 
-  function hitPlayer(ai) {
+  function hitPlayer(ai, p) {
     const a = asteroids[ai];
     asteroids.splice(ai, 1);
 
-    player.health--;
-    damageTaken++;
-    invulnT = 1.3;
-    FX.explosion(player.x, player.y);
+    p.health--;
+    p.damageTaken++;
+    p.invulnT = 1.3;
+    FX.explosion(p.x, p.y);
     FX.addShake(14);
-    FX.floatText(player.x, player.y - 30, "-1", "#ff4d6d", 22);
+    FX.floatText(p.x, p.y - 30, "-1", "#ff4d6d", 22);
 
-    if (player.health <= 0) {
-      gameOver();
+    if (p.health <= 0) {
+      // Ship is down but survives the run - the game only stops when all are.
+      p.diedAt = runTime;
     } else {
       // knock the player in the direction the asteroid was travelling,
       // then let the ship's rotation bob back and forth (looks chaotic)
       const dir = Math.abs(a.vy) > 20 ? (a.vy > 0 ? 1 : -1) : (Math.random() < 0.5 ? -1 : 1);
-      player.knockVy = dir * 300;
-      player.knockT = 0.45;
-      player.wobbleT = 0.5;
+      p.knockVy = dir * 300;
+      p.knockT = 0.45;
+      p.wobbleT = 0.5;
     }
   }
 
@@ -539,7 +655,9 @@ window.Game = (function () {
   };
 
   function spawnPowerup() {
-    const pool = ["money"];
+    const pool = [];
+    // Dollar bills are the main reward - make them the most common drop.
+    for (let k = 0; k < 4; k++) pool.push("money");
     DATA.powerups.forEach(function (p) {
       // weight controls how often a drop spawns (reload shows up more)
       const w = p.weight || 1;
@@ -562,50 +680,60 @@ window.Game = (function () {
     });
   }
 
-  function collectPowerup(p) {
+  function collectPowerup(pwr, pl) {
     const save = SAVE.load();
-    const f = PFX[p.id] || { color: "#ffffff", msg: "" };
+    const f = PFX[pwr.id] || { color: "#ffffff", msg: "" };
 
-    FX.pickupFx(p.x, p.y, f.color);
+    FX.pickupFx(pwr.x, pwr.y, f.color);
     FX.addShake(2);
 
-    if (p.id === "money") {
+    if (pwr.id === "money") {
       const gain = G.moneyPerBill;
       runCash += gain;
       score += gain;
-      FX.floatText(p.x, p.y - 16, "+$" + gain, "#ffe93a", 19);
-    } else if (p.id === "reload") {
-      player.ammo = Math.min(G.maxAmmo, player.ammo + 3);
-      FX.floatText(p.x, p.y - 16, f.msg, f.color, 17);
-    } else if (p.id === "health") {
-      if (player.health < player.maxHealth) {
-        player.health++;
-        FX.healFx(p.x, p.y);
-        FX.floatText(p.x, p.y - 16, f.msg, f.color, 17);
+      runStats.cashBills += gain;
+      runStats.pickups.money++;
+      FX.floatText(pwr.x, pwr.y - 16, "+$" + gain, "#ffe93a", 19);
+    } else if (pwr.id === "reload") {
+      pl.ammo = Math.min(G.maxAmmo, pl.ammo + 3);
+      runStats.pickups.reload++;
+      FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 17);
+    } else if (pwr.id === "health") {
+      if (pl.health < pl.maxHealth) {
+        pl.health++;
+        runStats.pickups.health++;
+        FX.healFx(pwr.x, pwr.y);
+        FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 17);
       } else {
         runCash += 10;
-        FX.floatText(p.x, p.y - 16, "Full +$10", "#ffe93a", 16);
+        runStats.cashBonus += 10;
+        FX.floatText(pwr.x, pwr.y - 16, "Full +$10", "#ffe93a", 16);
       }
-    } else if (p.id === "slow") {
-      slowT = 6;
-      FX.floatText(p.x, p.y - 16, f.msg, f.color, 18);
-    } else if (p.id === "shrink") {
+    } else if (pwr.id === "slow") {
+      slowT = G.slowMoDuration;
+      runStats.pickups.slow++;
+      FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 18);
+    } else if (pwr.id === "shrink") {
       shrinkT = 6;
-      FX.floatText(p.x, p.y - 16, f.msg, f.color, 18);
-    } else if (p.id === "clear") {
+      runStats.pickups.shrink++;
+      FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 18);
+    } else if (pwr.id === "clear") {
       // Wipe every asteroid off the board in one glorious blast
       const remaining = asteroids.slice();
       asteroids.length = 0;
       remaining.forEach(function (a) {
         score += a.size.score;
+        runStats.asteroidsDestroyed++;
+        runStats.scoreAsteroids += a.size.score;
         FX.explosion(a.x, a.y);
       });
-      FX.floatText(p.x, p.y - 16, f.msg, f.color, 22);
+      runStats.pickups.clear++;
+      FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 22);
       FX.addShake(10);
     }
 
     // lifetime collection stat
-    if (p.id !== "money") {
+    if (pwr.id !== "money") {
       save.stats.collector = (save.stats.collector || 0) + 1;
     }
     SAVE.save();
@@ -615,6 +743,9 @@ window.Game = (function () {
   //  GAME OVER
   // =====================================================
   function gameOver() {
+    // Guarded so a second hit in the same frame (both ships in 2P) can't
+    // pay the run out twice.
+    if (state === STATE.OVER) return;
     const save = SAVE.load();
 
     // pay out the cash earned this run
@@ -634,12 +765,62 @@ window.Game = (function () {
 
     // show the overlay with this run's numbers
     const newBest = score >= save.stats.bestScore && score > 0;
+    const st = runStats;
+    const kps = st.bulletsFired > 0 ? (st.asteroidsByBullets / st.bulletsFired) : 0;
+
+    // one little stat card per player (time up, damage taken, shots fired)
+    let playerCards = "";
+    players.forEach(function (p) {
+      const alive = p.diedAt == null ? runTime : p.diedAt;
+      playerCards +=
+        '<div class="player-stat">' +
+          '<div class="player-stat-head" style="color:' + p.color + '">' + p.name + '</div>' +
+          '<div class="player-stat-row"><span>TIME ALIVE</span><span>' + fmtTime(alive) + '</span></div>' +
+          '<div class="player-stat-row"><span>SHOTS FIRED</span><span>' + p.bulletsFired + '</span></div>' +
+          '<div class="player-stat-row"><span>DAMAGE TAKEN</span><span>' + p.damageTaken + '</span></div>' +
+        '</div>';
+    });
+
     document.getElementById("gameover-stats").innerHTML =
       '<div>Time Survived: ' + fmtTime(runTime) + '</div>' +
       '<div>Score: ' + Math.round(score) + '</div>' +
-      '<div>Money Earned: <span class="money">' + UI.fmt(runCash) + '</span></div>' +
+      '<div>Total Money Earned: <span class="money">' + UI.fmt(runCash) + '</span></div>' +
       '<div>Best Score: ' + save.stats.bestScore + '</div>' +
-      (newBest ? '<div class="new-best">NEW BEST SCORE!</div>' : "");
+      (newBest ? '<div class="new-best">NEW BEST SCORE!</div>' : "") +
+
+      '<div class="gameover-section">Money Breakdown</div>' +
+      '<div class="gameover-grid">' +
+        '<div><span>From Dollar Bills</span><span class="money">' + UI.fmt(st.cashBills) + '</span></div>' +
+        '<div><span>From Asteroid Wrecks</span><span class="money">' + UI.fmt(st.cashWrecks) + '</span></div>' +
+        '<div><span>From Full-Health Bonus</span><span class="money">' + UI.fmt(st.cashBonus) + '</span></div>' +
+      '</div>' +
+
+      '<div class="gameover-section">Score Breakdown</div>' +
+      '<div class="gameover-grid">' +
+        '<div><span>From Survival</span><span>' + Math.round(st.scoreSurvival) + '</span></div>' +
+        '<div><span>From Asteroids</span><span>' + Math.round(st.scoreAsteroids) + '</span></div>' +
+        '<div><span>From Dollar Bills</span><span>' + st.cashBills + '</span></div>' +
+      '</div>' +
+
+      '<div class="gameover-section">Combat</div>' +
+      '<div class="gameover-grid">' +
+        '<div><span>Shots Fired</span><span>' + st.bulletsFired + '</span></div>' +
+        '<div><span>Asteroids Destroyed</span><span>' + st.asteroidsDestroyed + '</span></div>' +
+        '<div><span>Blasted by Your Shots</span><span>' + st.asteroidsByBullets + '</span></div>' +
+        '<div><span>Kills Per Shot</span><span>' + kps.toFixed(2) + '</span></div>' +
+      '</div>' +
+
+      '<div class="gameover-section">Collectibles</div>' +
+      '<div class="gameover-grid">' +
+        '<div><span>Dollar Bills</span><span>' + st.pickups.money + '</span></div>' +
+        '<div><span>Reload Packs</span><span>' + st.pickups.reload + '</span></div>' +
+        '<div><span>Health Packs</span><span>' + st.pickups.health + '</span></div>' +
+        '<div><span>Slow-Mo</span><span>' + st.pickups.slow + '</span></div>' +
+        '<div><span>Shrink</span><span>' + st.pickups.shrink + '</span></div>' +
+        '<div><span>Screen Clears</span><span>' + st.pickups.clear + '</span></div>' +
+      '</div>' +
+
+      '<div class="gameover-players">' + playerCards + '</div>';
 
     state = STATE.OVER;
     document.getElementById("gameover-overlay").classList.remove("hidden");
@@ -681,53 +862,74 @@ window.Game = (function () {
     }
 
     // ---- bullets ----
-    const bulletImg = ASSETS.get(ASSETS_SRC(save.equipment.bullet));
-    const bNatW = bulletImg ? bulletImg.width || 30 : 30;
-    const bNatH = bulletImg ? bulletImg.height || 30 : 30;
     for (const b of bullets) {
+      // Each bullet remembers which player fired it, so the skins can differ.
+      const bDef = DATA.bullets.find(function (x) { return x.id === b.skin; }) || DATA.bullets[0];
+      const bulletImg = ASSETS.get(bDef ? bDef.src : "");
+      const bNatW = bulletImg ? bulletImg.width || 30 : 30;
+      const bNatH = bulletImg ? bulletImg.height || 30 : 30;
       // Each skin says which rotation makes it point right (see data.js).
-      const bDef = DATA.bullets.find(function (x) { return x.id === save.equipment.bullet; });
       const bRot = bDef ? bDef.rot : -90;
-      const s = 44 / Math.max(bNatW, bNatH);
-      drawImg(bulletImg, b.x, b.y, bNatW * s, bNatH * s, bRot);
+      const bs = 44 / Math.max(bNatW, bNatH);
+      drawImg(bulletImg, b.x, b.y, bNatW * bs, bNatH * bs, bRot);
     }
 
-    // ---- player trail (always on) ----
-    if (trail.length) {
-      const trailImg = ASSETS.get(ASSETS_SRC(save.equipment.boost));
-      trail.forEach(function (t, i) {
-        const alpha = ((i + 1) / trail.length) * 0.5;
+    // ---- player trails (always on) ----
+    players.forEach(function (p) {
+      if (p.health <= 0) return;   // downed ships leave no trail
+      if (!p.trail.length) return;
+      const trailImg = ASSETS.get(ASSETS_SRC(p.boost));
+      p.trail.forEach(function (t, i) {
+        const alpha = ((i + 1) / p.trail.length) * 0.5;
+        ctx.globalAlpha = alpha;
         if (trailImg) {
-          ctx.globalAlpha = alpha;
           drawImg(trailImg, t.x, t.y, 46, 46, t.rot);
         } else {
-          ctx.globalAlpha = alpha;
           ctx.fillStyle = "#ffe93a";
           ctx.beginPath();
           ctx.arc(t.x, t.y, 10, 0, Math.PI * 2);
           ctx.fill();
         }
       });
-      ctx.globalAlpha = 1;
-    }
+    });
+    ctx.globalAlpha = 1;
 
-    // ---- player ship ----
-    const shipImg = ASSETS.get(ASSETS_SRC(save.equipment.ship));
-    const shipW = 54 * (shrinkT > 0 ? 0.58 : 1);
-    const shipH = (shipImg && shipImg.height ? 54 * (shipImg.height / shipImg.width) : 38) * (shrinkT > 0 ? 0.58 : 1);
-    const blink = invulnT > 0 && Math.floor(runTime * 12) % 2 === 0;
-    if (!blink) {
-      drawSprite(ASSETS_SRC(save.equipment.ship), player.x, player.y, shipW, shipH, player.pitch + player.wobble);
-    }
+    // ---- player ships + name tags ----
+    players.forEach(function (p) {
+      const dead = p.health <= 0;
+      const shipImg = ASSETS.get(ASSETS_SRC(p.ship));
+      const scale = shrinkT > 0 ? 0.58 : 1;
+      const shipW = 54 * scale;
+      const shipH = (shipImg && shipImg.height ? 54 * (shipImg.height / shipImg.width) : 38) * scale;
 
-    // shrink ring so the player can see their smaller hitbox
-    if (shrinkT > 0) {
-      ctx.beginPath();
-      ctx.arc(player.x, player.y, playerRadius(), 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255,233,58,0.7)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
+      if (!dead) {
+        const blink = p.invulnT > 0 && Math.floor(runTime * 12) % 2 === 0;
+        if (!blink) {
+          drawSprite(ASSETS_SRC(p.ship), p.x, p.y, shipW, shipH, p.pitch + p.wobble);
+        }
+      }
+
+      // name tag above the ship (both players in 2P, none in solo)
+      if (players.length > 1) {
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.font = "bold 13px sans-serif";
+        ctx.shadowColor = "#000000";
+        ctx.shadowBlur = 4;
+        ctx.fillStyle = dead ? "#8a8a8a" : p.color;
+        ctx.fillText(dead ? p.name + " OUT" : p.name, p.x, p.y - shipH / 2 - 12);
+        ctx.restore();
+      }
+
+      // shrink ring so the player can see their smaller hitbox
+      if (!dead && shrinkT > 0) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, playerRadius(p), 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255,233,58,0.7)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    });
 
     // ---- effects on top ----
     FX.draw(ctx);
@@ -766,33 +968,58 @@ window.Game = (function () {
   //  HUD
   // =====================================================
   function updateHUD() {
-    const heartsEl = document.getElementById("hud-hearts");
-    const ammoEl = document.getElementById("hud-ammo");
     const scoreEl = document.getElementById("hud-score");
     const moneyEl = document.getElementById("hud-money");
-    const statusEl = document.getElementById("hud-status");
+    const playersHost = document.getElementById("hud-players");
 
-    if (!player) return;
+    if (!players.length) return;
 
-    let hearts = "";
-    for (let i = 0; i < player.maxHealth; i++) {
-      hearts += i < player.health ? '<span class="on">&#9829;</span>' : '<span class="off">&#9829;</span>';
+    // Rebuild the roster block only when a health / ammo value actually changed.
+    const rosterKey = players.map(function (p) {
+      return p.name + "|" + p.health + "|" + p.maxHealth + "|" + p.ammo;
+    }).join(";;");
+    if (playersHost._key !== rosterKey) {
+      playersHost._key = rosterKey;
+      let html = "";
+      players.forEach(function (p, pi) {
+        const dead = p.health <= 0;
+        const labelColor = dead ? "#8a8a8a" : p.color;
+        const label = p.name + (dead ? " OUT" : "");
+        let hearts = "";
+        for (let i = 0; i < p.maxHealth; i++) {
+          hearts += i < p.health ? '<span class="on">\u2665</span>' : '<span class="off">\u2665</span>';
+        }
+        let ammo = "";
+        for (let i = 0; i < G.maxAmmo; i++) {
+          const dim = dead || i >= p.ammo;
+          ammo += '<img class="ammo-dot' + (dim ? " dim" : "") + '" src="' + DATA.hud.bulletDot + '">';
+        }
+        html +=
+          '<div class="hud-row">' +
+            '<span class="hud-name" style="color:' + labelColor + '">' + label + '</span>' +
+            '<span class="hearts">' + hearts + '</span>' +
+          '</div>' +
+          '<div class="hud-row">' +
+            '<span class="hud-name hud-name-blank"></span>' +
+            '<span class="ammo">' + ammo + '</span>' +
+          '</div>' +
+          '<div class="hud-player-status" id="hud-player-status-' + pi + '"></div>';
+      });
+      playersHost.innerHTML = html;
     }
-    heartsEl.innerHTML = hearts;
 
-    // ammo: one bullet image per shell
-    const ammoVal = player.ammo;
-    if (ammoVal !== lastAmmo) {
-      lastAmmo = ammoVal;
-      ammoEl.innerHTML = "";
-      for (let i = 0; i < G.maxAmmo; i++) {
-        const img = document.createElement("img");
-        img.src = DATA.hud.bulletDot;
-        img.className = "ammo-dot";
-        if (i >= ammoVal) img.classList.add("dim");
-        ammoEl.appendChild(img);
-      }
-    }
+    // one status bar per player, refreshed every frame
+    players.forEach(function (p, pi) {
+      const chip = document.getElementById("hud-player-status-" + pi);
+      if (!chip) return;
+      const bits = [];
+      if (p.health <= 0) bits.push("OUT");
+      if (p.invulnT > 0) bits.push("INVULNERABLE");
+      if (shrinkT > 0) bits.push("SHRUNK " + shrinkT.toFixed(1) + "s");
+      if (slowT > 0) bits.push("SLOW " + slowT.toFixed(1) + "s");
+      chip.textContent = bits.join("  |  ");
+      chip.classList.toggle("out", p.health <= 0);
+    });
 
     // score: one digit image per character
     const scoreVal = Math.round(score);
@@ -808,12 +1035,6 @@ window.Game = (function () {
     }
 
     moneyEl.textContent = "$" + runCash;
-
-    let status = [];
-    if (slowT > 0) status.push("SLOW " + slowT.toFixed(1) + "s");
-    if (shrinkT > 0) status.push("SHRUNK " + shrinkT.toFixed(1) + "s");
-    if (invulnT > 0) status.push("INVULNERABLE");
-    statusEl.textContent = status.join("  |  ");
   }
 
   // =====================================================

@@ -18,9 +18,11 @@
 
         <div class="menu-buttons">
           <button id="btn-play" class="menu-btn"></button>
+          <button id="btn-play2" class="menu-btn"></button>
           <button id="btn-store" class="menu-btn"></button>
           <button id="btn-customize" class="menu-btn"></button>
           <button id="btn-achievements" class="menu-btn"></button>
+          <button id="btn-settings" class="menu-link">Settings</button>
         </div>
 
         <div class="menu-stats" id="menu-stats"></div>
@@ -31,6 +33,7 @@
           <strong>How to play:</strong>
           Up / Down arrows (or W / S) to move &middot; Space to shoot.
           Collect the dollar bill (+$20), the green circle (+3 bullets) and the battery (+1 life)!
+          Multiplayer: arrows + Space, and W/S + Shift.
         </p>
         <p class="small-note">Tip: hold the Up arrow and click Customize to reset your account.</p>
       </div>
@@ -42,21 +45,11 @@
 
       <div id="hud" class="hud">
         <div class="hud-left">
-          <div class="hud-row">
-            <span class="label">Lives</span>
-            <span id="hud-hearts" class="hearts"></span>
-          </div>
-          <div class="hud-row">
-            <span class="label">Bullets</span>
-            <span id="hud-ammo" class="ammo"></span>
-          </div>
+          <div id="hud-players"></div>
         </div>
         <div class="hud-right">
           <div class="hud-row"><span class="label">Score</span><span id="hud-score" class="score-digits"></span></div>
           <div class="hud-row"><span class="label">Cash</span><span id="hud-money" class="money">$0</span></div>
-        </div>
-        <div class="hud-bottom">
-          <span id="hud-status" class="status-chip"></span>
         </div>
       </div>
 
@@ -76,6 +69,29 @@
           <div id="gameover-stats" class="gameover-stats"></div>
           <button id="btn-retry" class="big-btn">Play Again</button>
           <button id="btn-over-menu" class="big-btn">Main Menu</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TWO PLAYER SETUP ============ -->
+    <section id="screen-p2" class="screen hidden">
+      <div id="p2-stars" class="screen-stars" aria-hidden="true"></div>
+      <div class="screen-panel">
+        <header class="screen-header">
+          <button id="p2-back" class="back-btn">&larr; Back</button>
+          <h2>MULTIPLAYER</h2>
+        </header>
+        <p class="screen-sub">
+          <strong>Player 1</strong> (blue) uses <strong>W / S + Shift</strong>.
+          <strong>Player 2</strong> (pink) uses <strong>Up / Down + Space</strong>.
+          Each player picks their own <strong>Ship</strong>, <strong>Boost Trail</strong> and
+          <strong>Shot</strong> from the skins you've unlocked. Highlight with
+          <strong>W/S</strong> or <strong>Up/Down</strong>, then pick with <strong>Shift</strong> or <strong>Space</strong>.
+          The run only ends when <strong>both</strong> ships are down!
+        </p>
+        <div id="p2-setup" class="p2-setup"></div>
+        <div class="p2-actions">
+          <button id="btn-p2-start" class="big-btn">START 2-PLAYER RUN</button>
         </div>
       </div>
     </section>
@@ -123,6 +139,31 @@
 
     <!-- Achievement toast -->
     <div id="toast" class="toast hidden"></div>
+
+    <!-- ============ SETTINGS SCREEN ============ -->
+    <section id="screen-settings" class="screen hidden">
+      <div id="settings-stars" class="screen-stars" aria-hidden="true"></div>
+      <div class="screen-panel">
+        <header class="screen-header">
+          <button id="settings-back" class="back-btn">&larr; Back</button>
+          <h2>SETTINGS</h2>
+        </header>
+        <div class="settings-list">
+          <label class="setting-row">
+            <span class="setting-name">Screen Shake</span>
+            <input type="checkbox" id="set-shake" class="setting-toggle">
+          </label>
+          <label class="setting-row">
+            <span class="setting-name">Special Effects</span>
+            <input type="checkbox" id="set-fx" class="setting-toggle">
+          </label>
+          <label class="setting-row">
+            <span class="setting-name">Sound Effects</span>
+            <input type="checkbox" id="set-sound" class="setting-toggle">
+          </label>
+        </div>
+      </div>
+    </section>
 
     <!-- Fading screen effect (used for round fade-ins/outs) -->
     <div id="fade" class="fade hidden"></div>

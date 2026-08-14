@@ -122,6 +122,33 @@ html, body {
   transform: scale(0.97);
 }
 
+/* Small text button for Settings under the image menu buttons */
+.menu-link {
+  align-self: center;
+  width: 200px;
+  padding: 8px 14px;
+  margin-top: 2px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #9fb6ff;
+  background: rgba(8, 12, 35, 0.85);
+  border: 2px solid #3d5aff;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.08s ease, color 0.08s ease;
+}
+
+.menu-link:hover {
+  transform: scale(1.05);
+  color: #ffffff;
+}
+
+.menu-link:active {
+  transform: scale(0.97);
+}
+
 .big-btn {
   font-family: inherit;
   font-size: clamp(19px, 3vw, 27px);
@@ -247,6 +274,34 @@ html, body {
   letter-spacing: 1px;
 }
 
+/* Player tag (P1 / P2) shown next to the hearts in the HUD */
+.hud-name {
+  font-size: 12px;
+  letter-spacing: 1px;
+  min-width: 24px;
+  -webkit-text-stroke: 1px #000;
+}
+
+.hud-name-blank { visibility: hidden; }
+
+/* Per-player status bar inside the HUD */
+.hud-player-status {
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffd23e;
+  background: rgba(10,14,30,0.7);
+  border: 1px solid #ffffff;
+  border-radius: 8px;
+  padding: 2px 8px;
+  display: inline-block;
+  margin: 0 0 8px;
+}
+
+.hud-player-status.out {
+  color: #ff6b81;
+  border-color: #ff6b81;
+}
+
 .hearts { font-size: 20px; letter-spacing: 2px; }
 .hearts .on  { color: #ff3b3b; }
 .hearts .off { color: #59303d; }
@@ -287,24 +342,6 @@ html, body {
 
 .money { color: #ffd23e; }
 
-.hud-bottom {
-  position: absolute;
-  left: 16px;
-  bottom: 14px;
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.status-chip {
-  font-size: 14px;
-  color: #ffd23e;
-  background: rgba(10,14,30,0.7);
-  padding: 4px 10px;
-  border-radius: 10px;
-  border: 2px solid #ffffff;
-}
-
 /* Overlays (pause / game over) */
 .overlay {
   position: absolute;
@@ -336,26 +373,102 @@ html, body {
   color: #1a1a2e;
 }
 
+#gameover-overlay .panel {
+  padding: 18px 24px;
+  gap: 6px;
+  max-height: 94vh;
+  overflow-y: auto;
+}
+
 .gameover-title {
   color: #ff3b3b;
   -webkit-text-stroke: 2px #1a1a2e;
-  font-size: 44px;
+  font-size: 34px;
 }
 
 .gameover-stats {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
-  line-height: 1.8;
+  line-height: 1.5;
   color: #1a1a2e;
 }
 
 .gameover-stats .money { color: #0a8500; }
 .gameover-stats .new-best { color: #ff3b3b; font-weight: 900; }
 
-/* ---------- Store & Customize screens (space theme) ---------- */
+/* Grouped stat sections on the game-over screen */
+.gameover-section {
+  margin: 9px 0 2px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #7d8ab8;
+}
+
+.gameover-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 20px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.gameover-grid > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #1a1a2e;
+}
+
+.gameover-grid > div span:last-child { font-weight: 900; }
+
+/* Per-player stat cards on the game-over screen */
+.gameover-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.player-stat {
+  background: rgba(20, 28, 70, 0.92);
+  border: 2px solid #3d5aff;
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
+  padding: 6px 12px 8px;
+  min-width: 120px;
+  text-align: left;
+}
+
+.player-stat-head {
+  font-weight: 900;
+  font-size: 16px;
+  letter-spacing: 2px;
+  text-align: center;
+  margin-bottom: 2px;
+  -webkit-text-stroke: 1px #1a1a2e;
+  text-shadow: 1px 1px 0 #1a1a2e;
+}
+
+.player-stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #dfe9ff;
+}
+
+.player-stat-row span:last-child {
+  color: #ffffff;
+}
+
+/* ---------- Store / Customize / Multiplayer screens (space theme) ---------- */
 #screen-store,
 #screen-customize,
-#screen-achievements {
+#screen-achievements,
+#screen-p2 {
   background:
     radial-gradient(1200px 600px at 82% -12%, rgba(110,140,255,0.28), transparent 62%),
     radial-gradient(900px 620px at 8% 112%, rgba(120,70,220,0.30), transparent 62%),
@@ -431,6 +544,112 @@ html, body {
   font-weight: 700;
   color: #cfe4ff;
   margin-bottom: 16px;
+}
+
+/* Two-player setup screen */
+.p2-card {
+  flex: 1 1 280px;
+  max-width: 460px;
+  background: rgba(20, 28, 70, 0.85);
+  border: 3px solid #3d5aff;
+  border-radius: 16px;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.4);
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.p2-setup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.p2-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.p2-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 2px solid #1a1a2e;
+}
+
+.p2-title {
+  font-size: 17px;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 2px 2px 0 #1a1a2e;
+  letter-spacing: 1px;
+}
+
+.p2-controls {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9fb6ff;
+  background: rgba(8, 12, 35, 0.9);
+  border: 1px solid #3d5aff;
+  border-radius: 8px;
+  padding: 2px 7px;
+}
+
+.p2-picker { margin-bottom: 10px; }
+
+.p2-label {
+  font-size: 11px;
+  font-weight: 900;
+  color: #cfe4ff;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.p2-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.p2-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  background: rgba(8, 12, 35, 0.9);
+  border: 2px solid #3d5aff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.08s ease;
+}
+
+.p2-thumb:hover { transform: scale(1.08); }
+
+.p2-thumb img {
+  max-width: 40px;
+  max-height: 40px;
+}
+
+.p2-thumb.selected {
+  border-color: #58e06c;
+  box-shadow: 0 0 10px rgba(88, 224, 108, 0.45);
+}
+
+/* Keyboard cursor ring for on-card costume picking */
+.p2-thumb.focused {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8);
+}
+
+.p2-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
 }
 
 /* Store grid + Drop chest */
@@ -887,6 +1106,47 @@ html, body {
   object-fit: contain;
 }
 
+/* ---------- Settings screen ---------- */
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+  margin: 10px auto 0;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: rgba(20, 28, 70, 0.85);
+  border: 2px solid #3d5aff;
+  border-radius: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: transform 0.08s ease;
+}
+
+.setting-row:hover {
+  transform: scale(1.02);
+}
+
+.setting-name {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #1a1a2e;
+}
+
+.setting-toggle {
+  width: 46px;
+  height: 26px;
+  accent-color: #58e06c;
+  cursor: pointer;
+}
+
 /* Full-screen fade used on transitions */
 .fade {
   position: fixed;
@@ -977,6 +1237,13 @@ html, body {
   width: 130px;
   height: 130px;
   object-fit: contain;
+}
+
+.reveal-item canvas {
+  width: 130px;
+  height: 130px;
+  border-radius: 10px;
+  border: 2px solid #3d5aff;
 }
 
 .reveal-name {

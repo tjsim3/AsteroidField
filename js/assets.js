@@ -37,6 +37,7 @@ window.ASSETS = (function () {
     DATA.bullets.forEach(b => srcs.push(b.src));
     DATA.trails.forEach(t => srcs.push(t.src));
     Object.values(DATA.dropIcons).forEach(p => srcs.push(p));
+    srcs.push("AsteroidsAndPowerups/Money.svg");
     srcs.push(DATA.SPREAD.asteroid, DATA.SPREAD.explosion, DATA.SPREAD.healFx);
 
     // menu, tips, HUD, achievements + store icons
