@@ -213,6 +213,7 @@ window.INPUT = { keys: {} };
   /* ---------------- boot ---------------- */
   Game.init();
   UI.applySettings(SAVE.load().settings);
+  UI.applyTheme();
   setMenuButtonImages();
   scatterStars($("menu-stars"));
   scatterStars($("store-stars"));

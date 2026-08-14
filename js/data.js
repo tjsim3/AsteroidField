@@ -29,35 +29,46 @@ window.DATA = (function () {
     "costume1.svg", "costume2.svg", "costume3.svg", "costume4.svg", "costume5.svg"
   ];
 
+  const SHIP_NAMES = [
+    "Scout", "Striker", "Falcon", "Viper", "Sunray", "Ranger", "Wraith",
+    "Spectre", "Mantis", "Barracuda", "Nova", "Comet", "Phantom", "Pulsar", "Eclipse"
+  ];
+
   const ships = shipFiles.map((file, i) => ({
     id: "ship-" + i,
     file: file,
     src: "ShipSkins/" + file,
-    name: "Ship " + (i + 1)
+    name: SHIP_NAMES[i]
   }));
 
   /* ---------- Bullet skins ---------- */
   // The skins are already drawn as a pair of bullets facing right, so they
   // are never rotated in-game.
+  const BULLET_NAMES = [
+    "Basic", "Laser", "Rockets", "Fang", "Wobble", "Slug", "Arrows",
+    "Photon", "Pulse", "Ultra Rockets"
+  ];
+
   const bullets = [];
-  for (let i = 1; i <= 10; i++) {
+  for (let i = 0; i < 10; i++) {
     bullets.push({
-      id: "bullet-" + i,
-      file: "costume" + i + ".svg",
-      src: "BulletSkins/costume" + i + ".svg",
-      name: "Shot " + i,
+      id: "bullet-" + (i + 1),
+      file: "costume" + (i + 1) + ".svg",
+      src: "BulletSkins/costume" + (i + 1) + ".svg",
+      name: BULLET_NAMES[i],
       rot: 0
     });
   }
 
   /* ---------- Boost trail skins ---------- */
+  const TRAIL_NAMES = ["Ember", "Ion", "Stardust", "BOOST", "Aurora"];
   const trails = [];
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 0; i < 5; i++) {
     trails.push({
-      id: "trail-" + i,
-      file: "costume" + i + ".svg",
-      src: "PlayerTrailSkins/costume" + i + ".svg",
-      name: "Trail " + i
+      id: "trail-" + (i + 1),
+      file: "costume" + (i + 1) + ".svg",
+      src: "PlayerTrailSkins/costume" + (i + 1) + ".svg",
+      name: TRAIL_NAMES[i]
     });
   }
 
@@ -173,7 +184,18 @@ window.DATA = (function () {
     "costume6.svg",
     "costume7.svg",
     "costume9.svg",
-    "costume10.svg"
+    "costume10.svg",
+    "costume11.svg",
+    "costume12.svg",
+    "costume13.svg",
+    "costume14.svg",
+    "costume15.svg",
+    "costume16.svg",
+    "costume17.svg",
+    "costume18.svg",
+    "costume19.svg",
+    "costume20.svg",
+    "costume21.svg"
   ].map(function (file, i) {
     return { id: "tip-" + (i + 1), src: "ProTips/" + file };
   });

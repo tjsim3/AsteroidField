@@ -391,6 +391,7 @@ window.UI = (function () {
           }
           s.equipment.background = bg.id;
           save.save();
+          applyTheme();
           setActiveFieldFor(field.key);
         });
         grid.appendChild(btn);
@@ -666,7 +667,44 @@ window.UI = (function () {
     buildAchievements();
   }
 
-    /* ---------------- Settings ---------------- */
+    /* ---------------- Background theme ---------------- */
+  function hexToRgba(hex, a) {
+    let h = hex.replace("#", "");
+    if (h.length === 3) h = h.split("").map(c => c + c).join("");
+    const n = parseInt(h, 16);
+    return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
+  }
+
+  function mixHex(a, b, t) {
+    let ha = a.replace("#", "");
+    let hb = b.replace("#", "");
+    if (ha.length === 3) ha = ha.split("").map(c => c + c).join("");
+    if (hb.length === 3) hb = hb.split("").map(c => c + c).join("");
+    const na = parseInt(ha, 16);
+    const nb = parseInt(hb, 16);
+    const ch = (shift) => {
+      const v = Math.round((((na >> shift) & 255) * (1 - t)) + (((nb >> shift) & 255) * t));
+      return ("0" + v.toString(16)).slice(-2);
+    };
+    return "#" + ch(16) + ch(8) + ch(0);
+  }
+
+  /* Paint every screen with the equipped background's palette. */
+  function applyTheme() {
+    const root = document.documentElement;
+    const bg = DATA.backgrounds.find(function (b) {
+      return b.id === save.load().equipment.background;
+    }) || DATA.backgrounds[0];
+    root.style.setProperty("--bg-top", bg.skyTop);
+    root.style.setProperty("--bg-mid", mixHex(bg.skyTop, bg.skyBottom, 0.46));
+    root.style.setProperty("--bg-bottom", bg.skyBottom);
+    root.style.setProperty("--bg-glow-a", hexToRgba(bg.accent, 0.28));
+    root.style.setProperty("--bg-glow-b", hexToRgba(bg.accent, 0.22));
+    root.style.setProperty("--bg-glow-c", hexToRgba(bg.accent, 0.12));
+    root.style.setProperty("--bg-star", mixHex(bg.accent, "#ffffff", 0.45));
+  }
+
+  /* ---------------- Settings ---------------- */
   function applySettings(s) {
     // FX is loaded before this module, so its toggles are safe here.
     FX.setShake(s.shake !== false);
@@ -709,7 +747,7 @@ window.UI = (function () {
     updateMenuStats, notify, setTip, buildStore, buildCustomize,
     buildAchievements, nextField, setActiveField, unlock, updateStoreMoney, fmt,
     buildP2Setup, getP2Config,
-    buildSettings, toggleSetting, applySettings,
+    buildSettings, toggleSetting, applySettings, applyTheme,
     setFreeDrops: function (on) { freeDrops = on; buildStore(); },
     isFreeDrops: function () { return freeDrops; }
   };

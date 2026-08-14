@@ -421,7 +421,9 @@ window.Game = (function () {
     powerupCd -= dt;
     if (powerupCd <= 0) {
       spawnPowerup();
-      powerupCd = 2.8 + Math.random() * 2.2;
+      // drops arrive a little faster as the run gets tougher
+      const t = Math.min(1, runTime / 90);
+      powerupCd = (2.8 + Math.random() * 2.2) * (1 - t * 0.35);
     }
 
     // ---- bullets ----
@@ -655,9 +657,12 @@ window.Game = (function () {
   };
 
   function spawnPowerup() {
+    // Money is the common drop early on, but fades as the run drags
+    // on so the useful power-ups start showing up more late-game.
+    const t = Math.min(1, runTime / 90);
+    const moneyW = Math.max(1, Math.round(4 - t * 3));
     const pool = [];
-    // Dollar bills are the main reward - make them the most common drop.
-    for (let k = 0; k < 4; k++) pool.push("money");
+    for (let k = 0; k < moneyW; k++) pool.push("money");
     DATA.powerups.forEach(function (p) {
       // weight controls how often a drop spawns (reload shows up more)
       const w = p.weight || 1;

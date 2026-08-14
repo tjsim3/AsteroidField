@@ -23,6 +23,17 @@ html, body {
   height: 100%;
 }
 
+/* Background palette - set from the player's selected background */
+:root {
+  --bg-top: #04071a;
+  --bg-mid: #081027;
+  --bg-bottom: #0a1338;
+  --bg-glow-a: rgba(110, 140, 255, 0.28);
+  --bg-glow-b: rgba(120, 70, 220, 0.30);
+  --bg-glow-c: rgba(80, 180, 255, 0.16);
+  --bg-star: #ffffff;
+}
+
 /* ---------- Screens ---------- */
 .screen {
   position: absolute;
@@ -40,10 +51,11 @@ html, body {
 /* ---------- Main menu (space theme) ---------- */
 #screen-menu {
   background:
-    radial-gradient(1200px 600px at 82% -12%, rgba(110,140,255,0.28), transparent 62%),
-    radial-gradient(900px 620px at 8% 112%, rgba(120,70,220,0.30), transparent 62%),
-    radial-gradient(500px 300px at 20% 8%, rgba(80,180,255,0.16), transparent 70%),
-    linear-gradient(180deg, #070b26 0%, #111843 46%, #1c1240 100%);
+    radial-gradient(1200px 600px at 82% -12%, var(--bg-glow-a), transparent 62%),
+    radial-gradient(900px 620px at 8% 112%, var(--bg-glow-b), transparent 62%),
+    radial-gradient(500px 300px at 20% 8%, var(--bg-glow-c), transparent 70%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 46%, var(--bg-bottom) 100%);
+  overflow-y: auto;
 }
 
 /* Twinkling CSS starfield behind the menu */
@@ -56,7 +68,7 @@ html, body {
 
 .star {
   position: absolute;
-  background: #ffffff;
+  background: var(--bg-star);
   border-radius: 50%;
   animation: star-twinkle 3s ease-in-out infinite;
 }
@@ -68,7 +80,7 @@ html, body {
 
 .menu-panel {
   text-align: center;
-  padding: 20px;
+  padding: 36px 20px 30px;
 }
 
 .title {
@@ -464,15 +476,17 @@ html, body {
   color: #ffffff;
 }
 
-/* ---------- Store / Customize / Multiplayer screens (space theme) ---------- */
+/* ---------- Store / Customize / Multiplayer / Settings screens (space theme) ---------- */
 #screen-store,
 #screen-customize,
 #screen-achievements,
-#screen-p2 {
+#screen-p2,
+#screen-settings {
   background:
-    radial-gradient(1200px 600px at 82% -12%, rgba(110,140,255,0.28), transparent 62%),
-    radial-gradient(900px 620px at 8% 112%, rgba(120,70,220,0.30), transparent 62%),
-    linear-gradient(180deg, #070b26 0%, #111843 46%, #1c1240 100%);
+    radial-gradient(1200px 600px at 82% -12%, var(--bg-glow-a), transparent 62%),
+    radial-gradient(900px 620px at 8% 112%, var(--bg-glow-b), transparent 62%),
+    radial-gradient(500px 300px at 20% 8%, var(--bg-glow-c), transparent 70%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 46%, var(--bg-bottom) 100%);
 }
 
 /* Twinkling CSS starfield behind these screens (same as the menu) */
