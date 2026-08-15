@@ -80,11 +80,11 @@ html, body {
 
 .menu-panel {
   text-align: center;
-  padding: 36px 20px 30px;
+  padding: clamp(12px, 3vh, 36px) 20px clamp(16px, 3vh, 30px);
 }
 
 .title {
-  font-size: clamp(46px, 10vw, 96px);
+  font-size: clamp(24px, 10vh, 84px);
   font-weight: 900;
   color: #ffffff;
   -webkit-text-stroke: 4px #1a1a2e;
@@ -94,17 +94,17 @@ html, body {
 }
 
 .tagline {
-  font-size: clamp(15px, 2.6vw, 22px);
+  font-size: clamp(13px, 2.2vh, 22px);
   font-weight: 700;
   color: #cfe4ff;
-  margin: 6px 0 26px;
+  margin: clamp(2px, 0.6vh, 6px) 0 clamp(8px, 2.2vh, 26px);
   text-shadow: 1px 1px 0 rgba(0,0,0,0.6);
 }
 
 .menu-buttons {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: clamp(4px, 1.2vh, 14px);
   max-width: 320px;
   margin: 0 auto;
 }
@@ -112,8 +112,8 @@ html, body {
 /* Menu buttons are image buttons now */
 .menu-btn {
   display: block;
-  width: 320px;
-  height: 76px;
+  width: clamp(240px, 24vw, 320px);
+  height: clamp(32px, 8vh, 76px);
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
@@ -138,10 +138,10 @@ html, body {
 .menu-link {
   align-self: center;
   width: 200px;
-  padding: 8px 14px;
+  padding: clamp(4px, 0.8vh, 8px) 14px;
   margin-top: 2px;
   font-family: inherit;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 900;
   letter-spacing: 2px;
   color: #9fb6ff;
@@ -189,19 +189,19 @@ html, body {
 .customize-btn{ background: #be86ff; }
 
 .menu-stats {
-  margin-top: 24px;
+  margin-top: clamp(8px, 1.8vh, 24px);
   display: inline-flex;
-  gap: 18px;
+  gap: clamp(8px, 1.5vh, 18px);
   flex-wrap: wrap;
   justify-content: center;
   font-weight: 900;
-  font-size: 17px;
+  font-size: clamp(12px, 1.8vh, 17px);
   color: #1a1a2e;
   background: #ffffff;
   border: 3px solid #1a1a2e;
   border-radius: 14px;
   box-shadow: 4px 4px 0 #1a1a2e;
-  padding: 10px 18px;
+  padding: clamp(4px, 0.9vh, 10px) 18px;
 }
 
 .menu-stats .money { color: #0a8500; }
@@ -210,9 +210,9 @@ html, body {
 
 /* Pro-tip bar on the menu */
 .tip-box {
-  margin: 16px auto 0;
+  margin: clamp(8px, 1.6vh, 16px) auto 0;
   width: min(560px, 90vw);
-  min-height: 84px;
+  min-height: clamp(40px, 7.5vh, 84px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -225,23 +225,23 @@ html, body {
 
 .tip-box img {
   max-width: 100%;
-  max-height: 78px;
+  max-height: clamp(38px, 6.5vh, 78px);
   display: block;
 }
 
 .how-to {
-  margin: 22px auto 0;
+  margin: clamp(8px, 1.8vh, 22px) auto 0;
   max-width: 560px;
-  font-size: 14px;
+  font-size: clamp(11px, 1.7vh, 14px);
   font-weight: 700;
-  line-height: 1.6;
+  line-height: 1.55;
   color: #dfe9ff;
   text-shadow: 1px 1px 0 rgba(0,0,0,0.6);
 }
 
 .small-note {
-  margin-top: 8px;
-  font-size: 12px;
+  margin-top: clamp(3px, 0.6vh, 8px);
+  font-size: clamp(10px, 1.5vh, 12px);
   color: #b9c7ec;
 }
 
@@ -1157,6 +1157,31 @@ html, body {
 .setting-toggle {
   width: 46px;
   height: 26px;
+  accent-color: #58e06c;
+  cursor: pointer;
+}
+
+.setting-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.setting-value {
+  min-width: 34px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #9fd8ff;
+  background: rgba(8, 12, 35, 0.85);
+  border: 2px solid #3d5aff;
+  border-radius: 8px;
+  padding: 2px 6px;
+}
+
+.setting-control input[type="range"] {
+  width: 170px;
   accent-color: #58e06c;
   cursor: pointer;
 }

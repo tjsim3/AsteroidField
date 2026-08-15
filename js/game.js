@@ -414,8 +414,11 @@ window.Game = (function () {
       // sometimes a burst of two, so the action feels fast
       if (Math.random() < (twoPlayer ? 0.55 : 0.35)) spawnAsteroid();
       if (twoPlayer && Math.random() < 0.2) spawnAsteroid();
-      const difficulty = Math.max(0.3, 1.0 - runTime * 0.012);
-      spawnCd = difficulty * (0.55 + Math.random() * 0.5) * (twoPlayer ? 0.55 : 1);
+      // Mean rocks/sec = 1.6875 / difficulty (1P) and 3 / difficulty (2P).
+      // The 2P interval factor 0.7291667 makes 1.75 rocks/event land exactly
+      // on the 3/difficulty rate (1.75 / (0.8 * 0.7291667) = 3).
+      const interval = (0.55 + Math.random() * 0.5) * (twoPlayer ? 0.7291667 : 1);
+      spawnCd = difficulty() * interval;
     }
 
     powerupCd -= dt;
@@ -423,7 +426,7 @@ window.Game = (function () {
       spawnPowerup();
       // drops arrive a little faster as the run gets tougher
       const t = Math.min(1, runTime / 90);
-      powerupCd = (2.8 + Math.random() * 2.2) * (1 - t * 0.35);
+      powerupCd = (5.6 + Math.random() * 4.4) * (1 - t * 0.35);
     }
 
     // ---- bullets ----
@@ -513,6 +516,28 @@ window.Game = (function () {
     }
   }
 
+  /* Difficulty driver for asteroid spawn cadence.
+   Falls linearly 1 - 0.012t until 58.3 s (value 0.3), then keeps
+   declining at a slow linear rate instead of clamping to a floor,
+   so the rate keeps creeping up for very long runs. */
+  function difficulty() {
+    const t = runTime;
+    if (t <= 58.3333) return 1 - t * 0.012;
+    return Math.max(0.05, 0.3 - 0.001 * (t - 58.3333));
+  }
+
+  /* Returns the *mean* asteroid rate in rocks/sec for the current mode. */
+  function asteroidRate() {
+    return (twoPlayer ? 3 : 1.6875) / difficulty();
+  }
+
+  /* Returns the *mean* power-up drop rate in drops/sec (same 1P / 2P).
+   Mean interval 7.8 s - power-up drops run at half their old rate. */
+  function dropRate() {
+    const t = Math.min(1, runTime / 90);
+    return 1 / (7.8 * (1 - 0.35 * t));
+  }
+
   // =====================================================
   //  FIRING
   // =====================================================
@@ -532,6 +557,7 @@ window.Game = (function () {
       skin: p.bullet   // this player's chosen shot skin
     });
     FX.muzzleFlash(p.x + 24, p.y);
+    SFX.shoot();
   }
 
   // =====================================================
@@ -586,6 +612,7 @@ window.Game = (function () {
     // explosions everywhere
     FX.explosion(a.x, a.y);
     FX.floatText(a.x, a.y - 14, "+" + a.size.score, "#8fd0ff", 15);
+    SFX.boom(a.size.key);
 
     // big rocks break into two mediums, mediums into two smalls
     if (!fromClear) {
@@ -631,6 +658,7 @@ window.Game = (function () {
     FX.explosion(p.x, p.y);
     FX.addShake(14);
     FX.floatText(p.x, p.y - 30, "-1", "#ff4d6d", 22);
+    SFX.hurt();
 
     if (p.health <= 0) {
       // Ship is down but survives the run - the game only stops when all are.
@@ -657,10 +685,11 @@ window.Game = (function () {
   };
 
   function spawnPowerup() {
-    // Money is the common drop early on, but fades as the run drags
-    // on so the useful power-ups start showing up more late-game.
+    // Money's spawn weight was cut to a third of what it used to be:
+    // it now keeps a steady weight of 1 (about 1-in-8 drops at any
+    // point in the run) instead of dominating the early game.
     const t = Math.min(1, runTime / 90);
-    const moneyW = Math.max(1, Math.round(4 - t * 3));
+    const moneyW = Math.max(1, Math.round((4 - t * 3) / 3));
     const pool = [];
     for (let k = 0; k < moneyW; k++) pool.push("money");
     DATA.powerups.forEach(function (p) {
@@ -699,29 +728,35 @@ window.Game = (function () {
       runStats.cashBills += gain;
       runStats.pickups.money++;
       FX.floatText(pwr.x, pwr.y - 16, "+$" + gain, "#ffe93a", 19);
+      SFX.coin();
     } else if (pwr.id === "reload") {
       pl.ammo = Math.min(G.maxAmmo, pl.ammo + 3);
       runStats.pickups.reload++;
       FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 17);
+      SFX.power();
     } else if (pwr.id === "health") {
       if (pl.health < pl.maxHealth) {
         pl.health++;
         runStats.pickups.health++;
         FX.healFx(pwr.x, pwr.y);
         FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 17);
+        SFX.heal();
       } else {
         runCash += 10;
         runStats.cashBonus += 10;
         FX.floatText(pwr.x, pwr.y - 16, "Full +$10", "#ffe93a", 16);
+        SFX.click();
       }
     } else if (pwr.id === "slow") {
       slowT = G.slowMoDuration;
       runStats.pickups.slow++;
       FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 18);
+      SFX.slowMo();
     } else if (pwr.id === "shrink") {
       shrinkT = 6;
       runStats.pickups.shrink++;
       FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 18);
+      SFX.power();
     } else if (pwr.id === "clear") {
       // Wipe every asteroid off the board in one glorious blast
       const remaining = asteroids.slice();
@@ -735,6 +770,7 @@ window.Game = (function () {
       runStats.pickups.clear++;
       FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 22);
       FX.addShake(10);
+      SFX.bigBoom();
     }
 
     // lifetime collection stat
@@ -751,6 +787,7 @@ window.Game = (function () {
     // Guarded so a second hit in the same frame (both ships in 2P) can't
     // pay the run out twice.
     if (state === STATE.OVER) return;
+    SFX.over();
     const save = SAVE.load();
 
     // pay out the cash earned this run

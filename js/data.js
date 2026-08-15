@@ -12,10 +12,10 @@ window.DATA = (function () {
     startAmmo: 12,         // bullets at the start
     maxAmmo: 24,           // bullet cap
     fireCooldown: 0.16,    // seconds between shots (hold Space to auto-fire)
-    slowMoDuration: 18,    // seconds the Slow-Mo power-up lasts (3x the original 6)
+    slowMoDuration: 12,    // seconds the Slow-Mo power-up lasts
     playerSpeed: 520,      // up/down speed (px/s)
     bulletPierce: 2,       // a bullet can punch through this many EXTRA asteroids
-    moneyPerBill: 20,      // value of the dollar bill drop
+    moneyPerBill: 50,      // value of the dollar bill drop
     moneyPerAsteroid: 2,   // small reward for destroying an asteroid
     chestPrice: 50,        // base price of one Shop drop (escalates with each purchase)
     asteroidSpeedMul: 1.45, // how much faster asteroids fly left

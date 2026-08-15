@@ -38,6 +38,18 @@ window.INPUT = { keys: {} };
     delete INPUT.keys[k];
   });
 
+  /* Sound: browsers need a click/keypress before audio can start.
+     Any button press also gets a little UI "click". */
+  document.addEventListener("pointerdown", function () { SFX.unlock(); });
+  document.addEventListener("keydown", function () { SFX.unlock(); });
+  document.addEventListener("click", function (e) {
+    const t = e.target;
+    if (t && t.closest && t.closest("button, label")) {
+      SFX.unlock();
+      SFX.click();
+    }
+  });
+
   // Pause the game when the tab loses focus
   window.addEventListener("blur", function () {
     if (Game.isInGame()) Game.togglePause();
@@ -159,14 +171,22 @@ window.INPUT = { keys: {} };
   $("achievements-back").addEventListener("click", goToMenu);
   $("settings-back").addEventListener("click", goToMenu);
 
-  // Settings toggles (shake / special effects / sound)
-  ["shake", "fx", "sound"].forEach(function (key) {
+  // Settings toggles (shake / special effects) + the sound volume slider
+  ["shake", "fx"].forEach(function (key) {
     const el = $("set-" + key);
     if (!el) return;
     el.addEventListener("change", function () {
       UI.toggleSetting(key, el.checked);
     });
   });
+  const soundEl = $("set-sound");
+  if (soundEl) {
+    const soundVal = $("set-sound-val");
+    soundEl.addEventListener("input", function () {
+      UI.toggleSetting("sound", Number(soundEl.value));
+      if (soundVal) soundVal.textContent = soundEl.value;
+    });
+  }
 
   $("btn-resume").addEventListener("click", function () {
     Game.togglePause();

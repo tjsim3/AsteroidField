@@ -39,7 +39,7 @@ window.SAVE = (function () {
       settings: {
         shake: true,             // screen shake on impacts
         fx: true,                // particle / special effects
-        sound: true              // sound effects (no audio yet)
+        sound: 80               // sound volume (0 = off, 100 = max)
       }
     };
   }

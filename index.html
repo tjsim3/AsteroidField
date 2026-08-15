@@ -31,9 +31,9 @@
 
         <p class="how-to">
           <strong>How to play:</strong>
-          Up / Down arrows (or W / S) to move &middot; Space to shoot.
-          Collect the dollar bill (+$20), the green circle (+3 bullets) and the battery (+1 life)!
-          Multiplayer: arrows + Space, and W/S + Shift.
+          Up / Down (or W / S) to move, Space (or Shift) to shoot.
+          Grab dollar bills (+$50), bullets and health packs!
+          Multiplayer: Player 1 = W/S + Shift &middot; Player 2 = Arrows + Space.
         </p>
         <p class="small-note">Tip: hold the Up arrow and click Customize to reset your account.</p>
       </div>
@@ -159,7 +159,10 @@
           </label>
           <label class="setting-row">
             <span class="setting-name">Sound Effects</span>
-            <input type="checkbox" id="set-sound" class="setting-toggle">
+            <span class="setting-control">
+              <input type="range" id="set-sound" min="0" max="100" step="5" value="80">
+              <span id="set-sound-val" class="setting-value">80</span>
+            </span>
           </label>
         </div>
       </div>
@@ -177,6 +180,7 @@
   <script src="js/save.js"></script>
   <script src="js/assets.js"></script>
   <script src="js/effects.js"></script>
+  <script src="js/sound.js"></script>
   <script src="js/screens.js"></script>
   <script src="js/game.js"></script>
   <script src="js/main.js"></script>

@@ -664,6 +664,7 @@ window.UI = (function () {
     s.achievements[id] = true;
     save.save();
     if (def) notify("Achievement unlocked: " + def.name, def.src);
+    if (window.SFX) SFX.unlockFx();
     buildAchievements();
   }
 
@@ -705,28 +706,42 @@ window.UI = (function () {
   }
 
   /* ---------------- Settings ---------------- */
+  /* Expects the *settings object* (s.settings on disk), never the
+     whole save - reading e.g. s.shake off the full save is always
+     undefined and would force every toggle back on. */
   function applySettings(s) {
-    // FX is loaded before this module, so its toggles are safe here.
+    s = s || {};
     FX.setShake(s.shake !== false);
     FX.setFx(s.fx !== false);
+    if (window.SFX) SFX.setVolume(soundLevel(s.sound));
+  }
+
+  /* Sound is a volume number 0-100 now; old saves may still hold
+     a boolean, which maps to all-the-way (true) or muted (false). */
+  function soundLevel(v) {
+    return typeof v === "number" ? v / 100 : (v ? 1 : 0);
   }
 
   function buildSettings() {
     const s = save.load();
-    applySettings(s);
+    applySettings(s.settings);
     const shake = $("set-shake");
     const fx = $("set-fx");
     const sound = $("set-sound");
     if (shake) shake.checked = s.settings.shake !== false;
     if (fx) fx.checked = s.settings.fx !== false;
-    if (sound) sound.checked = s.settings.sound !== false;
+    if (sound) {
+      sound.value = Math.round(soundLevel(s.settings.sound) * 100);
+      const lbl = $("set-sound-val");
+      if (lbl) lbl.textContent = sound.value;
+    }
   }
 
   function toggleSetting(key, on) {
     const s = save.load();
     s.settings[key] = on;
     save.save();
-    applySettings(s);
+    applySettings(s.settings);
   }
 
   /* Keep every visible background thumbnail drifting every frame.
