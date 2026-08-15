@@ -491,14 +491,17 @@ window.Game = (function () {
     }
 
     // ---- achievements tied to time / round score ----
-    if (score >= 250) UI.unlock("round_250");
-    if (score >= 750) UI.unlock("round_750");
+    const ROUND_ACH = [
+      [500, "round_500"], [2000, "round_2000"], [5000, "round_5000"],
+      [10000, "round_10000"], [25000, "round_25000"]
+    ];
+    ROUND_ACH.forEach(function (r) { if (score >= r[0]) UI.unlock(r[1]); });
 
-    // lifetime play time (for the 2h / 10h achievements)
+    // lifetime play time (for the 1h / 5h achievements)
     const saveT = SAVE.load();
     saveT.stats.totalTime += dt;
-    if (saveT.stats.totalTime >= 7200) UI.unlock("play_2h");
-    if (saveT.stats.totalTime >= 36000) UI.unlock("play_10h");
+    if (saveT.stats.totalTime >= 3600) UI.unlock("play_1h");
+    if (saveT.stats.totalTime >= 18000) UI.unlock("play_5h");
     SAVE.save();
 
     // ---- HUD ----
@@ -636,8 +639,13 @@ window.Game = (function () {
 
     // lifetime stats + achievements
     save.stats.asteroidsDestroyed++;
-    if (save.stats.asteroidsDestroyed >= 1000) UI.unlock("destroy_1000");
-    if (save.stats.asteroidsDestroyed >= 10000) UI.unlock("destroy_10000");
+    const DESTROY_ACH = [
+      [100, "destroy_100"], [1000, "destroy_1000"],
+      [10000, "destroy_10000"], [25000, "destroy_25000"]
+    ];
+    DESTROY_ACH.forEach(function (d) {
+      if (save.stats.asteroidsDestroyed >= d[0]) UI.unlock(d[1]);
+    });
     SAVE.save();
   }
 
@@ -799,10 +807,26 @@ window.Game = (function () {
     if (score > save.stats.bestScore) save.stats.bestScore = Math.round(score);
     if (runTime > save.stats.bestTime) save.stats.bestTime = runTime;
 
+    // roll this run's other numbers into the lifetime stats
+    save.stats.bulletsFired = (save.stats.bulletsFired || 0) + runStats.bulletsFired;
+    save.stats.asteroidsByBullets = (save.stats.asteroidsByBullets || 0) + runStats.asteroidsByBullets;
+    save.stats.timesDowned = (save.stats.timesDowned || 0) +
+      players.reduce(function (sum, p) { return sum + p.damageTaken; }, 0);
+    const pk = save.stats.pickups = save.stats.pickups || {};
+    ["money", "reload", "health", "slow", "shrink", "clear"].forEach(function (k) {
+      pk[k] = (pk[k] || 0) + runStats.pickups[k];
+    });
+
     // round-count and lifetime-score achievements
-    if (save.stats.runsPlayed >= 5) UI.unlock("rounds_5");
-    if (save.stats.runsPlayed >= 50) UI.unlock("rounds_50");
-    if (save.stats.lifetimeScore >= 1000000) UI.unlock("total_1m");
+    const ROUNDS_ACH = [[5, "rounds_5"], [10, "rounds_10"], [50, "rounds_50"],
+                        [100, "rounds_100"], [250, "rounds_250"]];
+    ROUNDS_ACH.forEach(function (r) {
+      if (save.stats.runsPlayed >= r[0]) UI.unlock(r[1]);
+    });
+    const TOTAL_ACH = [[10000, "total_10k"], [100000, "total_100k"], [1000000, "total_1m"]];
+    TOTAL_ACH.forEach(function (t) {
+      if (save.stats.lifetimeScore >= t[0]) UI.unlock(t[1]);
+    });
     SAVE.save();
 
     // show the overlay with this run's numbers

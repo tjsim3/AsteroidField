@@ -149,17 +149,41 @@ window.DATA = (function () {
   ];
 
   /* ---------- Achievements (the images ARE the achievement buttons) ---------- */
+  // Progressive chains are grouped together; "track" names the save stat (or
+  // "buyall") that drives the progress shown on the Achievements screen, and
+  // "goal" is that stat's target value.
   const achievements = [
-    { id: "rounds_50",    file: "costume2.svg",  name: "Play 50 Rounds" },
-    { id: "destroy_1000", file: "costume3.svg",  name: "Destroy 1000 Asteroids" },
-    { id: "destroy_10000",file: "costume4.svg",  name: "Destroy 10000 Asteroids" },
-    { id: "buy_all",      file: "costume5.svg",  name: "Buy all the items" },
-    { id: "total_1m",     file: "costume6.svg",  name: "Get a total of 1,000,000 points" },
-    { id: "round_250",    file: "costume8.svg",  name: "Reach 250 points in one round" },
-    { id: "round_750",    file: "costume9.svg",  name: "Reach 750 points in one round" },
-    { id: "play_2h",      file: "costume10.svg", name: "Play for 2 hours" },
-    { id: "play_10h",     file: "costume11.svg", name: "Play for 10 hours" },
-    { id: "rounds_5",     file: "costume12.svg", name: "Play 5 Rounds" }
+    // Points in one round (tracked by best single-run score)
+    { id: "round_500",    file: "a-round-500.svg",    name: "Reach 500 Points",     group: "Points in One Round",    track: "bestScore", goal: 500 },
+    { id: "round_2000",   file: "a-round-2000.svg",   name: "Reach 2000 Points",    group: "Points in One Round",    track: "bestScore", goal: 2000 },
+    { id: "round_5000",   file: "a-round-5000.svg",   name: "Reach 5000 Points",    group: "Points in One Round",    track: "bestScore", goal: 5000 },
+    { id: "round_10000",  file: "a-round-10000.svg",  name: "Reach 10000 Points",   group: "Points in One Round",    track: "bestScore", goal: 10000 },
+    { id: "round_25000",  file: "a-round-25000.svg",  name: "Reach 25000 Points",   group: "Points in One Round",    track: "bestScore", goal: 25000 },
+
+    // Time played
+    { id: "play_1h", file: "a-play-1h.svg", name: "Play for 1 Hour",  group: "Time Played", track: "totalTime", goal: 3600 },
+    { id: "play_5h", file: "a-play-5h.svg", name: "Play for 5 Hours", group: "Time Played", track: "totalTime", goal: 18000 },
+
+    // Total points
+    { id: "total_10k",  file: "a-total-10k.svg",  name: "10,000 Total Points",     group: "Total Points", track: "lifetimeScore", goal: 10000 },
+    { id: "total_100k", file: "a-total-100k.svg", name: "100,000 Total Points",    group: "Total Points", track: "lifetimeScore", goal: 100000 },
+    { id: "total_1m",   file: "a-total-1m.svg",   name: "1,000,000 Total Points",  group: "Total Points", track: "lifetimeScore", goal: 1000000 },
+
+    // Rounds played
+    { id: "rounds_5",   file: "a-rounds-5.svg",   name: "Play 5 Rounds",   group: "Rounds Played", track: "runsPlayed", goal: 5 },
+    { id: "rounds_10",  file: "a-rounds-10.svg",  name: "Play 10 Rounds",  group: "Rounds Played", track: "runsPlayed", goal: 10 },
+    { id: "rounds_50",  file: "a-rounds-50.svg",  name: "Play 50 Rounds",  group: "Rounds Played", track: "runsPlayed", goal: 50 },
+    { id: "rounds_100", file: "a-rounds-100.svg", name: "Play 100 Rounds", group: "Rounds Played", track: "runsPlayed", goal: 100 },
+    { id: "rounds_250", file: "a-rounds-250.svg", name: "Play 250 Rounds", group: "Rounds Played", track: "runsPlayed", goal: 250 },
+
+    // Asteroids destroyed
+    { id: "destroy_100",   file: "a-destroy-100.svg",   name: "Destroy 100 Asteroids",   group: "Asteroids Destroyed", track: "asteroidsDestroyed", goal: 100 },
+    { id: "destroy_1000",  file: "a-destroy-1000.svg",  name: "Destroy 1000 Asteroids",  group: "Asteroids Destroyed", track: "asteroidsDestroyed", goal: 1000 },
+    { id: "destroy_10000", file: "a-destroy-10000.svg", name: "Destroy 10000 Asteroids", group: "Asteroids Destroyed", track: "asteroidsDestroyed", goal: 10000 },
+    { id: "destroy_25000", file: "a-destroy-25000.svg", name: "Destroy 25000 Asteroids", group: "Asteroids Destroyed", track: "asteroidsDestroyed", goal: 25000 },
+
+    // Staples
+    { id: "buy_all", file: "a-buy-all.svg", name: "Buy All the Items", group: "Staples", track: "buyall", goal: 1 }
   ];
   achievements.forEach(function (a) {
     a.src = "Achievements/" + a.file;

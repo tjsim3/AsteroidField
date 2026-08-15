@@ -39,14 +39,44 @@ window.UI = (function () {
   }
 
   /* ---------------- Achievements screen ---------------- */
+  // Achievements are laid out as progressive groups (e.g. "Points in One
+  // Round" -> 500/2000/5000/10000/25000) with a lifetime-stats panel on top.
   function buildAchievements() {
     const grid = $("achievements-grid");
     if (!grid) return;
     grid.innerHTML = "";
     const s = save.load();
+
+    const stats = $("ach-stats");
+    if (stats) stats.innerHTML = lifetimeStats(s);
+
+    let lastGroup = null;
+    let inner = null;
     DATA.achievements.forEach(function (a) {
-      grid.appendChild(achItem(a, !!s.achievements[a.id]));
+      if (a.group !== lastGroup) {
+        lastGroup = a.group;
+        const groupEl = document.createElement("div");
+        groupEl.className = "ach-group";
+        const head = document.createElement("div");
+        head.className = "ach-group-title";
+        head.innerHTML =
+          "<h3>" + a.group + "</h3>" +
+          '<span class="ach-progress">' + groupProgress(s, a.group) + "</span>";
+        groupEl.appendChild(head);
+        inner = document.createElement("div");
+        inner.className = "ach-list";
+        groupEl.appendChild(inner);
+        grid.appendChild(groupEl);
+      }
+      inner.appendChild(achItem(a, !!s.achievements[a.id]));
     });
+  }
+
+  function groupProgress(s, group) {
+    const list = DATA.achievements.filter(function (a) { return a.group === group; });
+    let got = 0;
+    list.forEach(function (a) { if (s.achievements[a.id]) got++; });
+    return got + " / " + list.length + " Unlocked";
   }
 
   /* One achievement badge (the image is the button, like the original). */
@@ -56,17 +86,87 @@ window.UI = (function () {
     const img = document.createElement("img");
     img.src = a.src;
     img.alt = a.name;
-    const name = document.createElement("span");
-    name.className = "ach-name";
-    name.textContent = unlocked ? a.name : "???";
-    const state = document.createElement("span");
-    state.className = "ach-state";
-    state.textContent = unlocked ? "UNLOCKED" : "LOCKED";
     item.appendChild(img);
-    item.appendChild(name);
-    item.appendChild(state);
-    item.title = a.name + " \u2014 " + a.desc;
+    if (unlocked) {
+      item.title = "Unlocked: " + a.name;
+    } else {
+      item.title = "Locked: " + a.name + " \u2014 Progress " + progressLabel(a);
+    }
     return item;
+  }
+
+  // Live progress for a not-yet-unlocked achievement.
+  function progressLabel(a) {
+    const s = save.load();
+    const cur = trackValue(s, a);
+    if (a.track === "buyall") {
+      return cur + " / " + totalCustomizations() + " items owned";
+    }
+    return num(cur) + " / " + num(a.goal);
+  }
+
+  function trackValue(s, a) {
+    if (a.track === "buyall") return countOwned(s);
+    return s.stats[a.track] || 0;
+  }
+
+  function countOwned(s) {
+    let n = 0;
+    allCustomizations().forEach(function (g) {
+      g.items.forEach(function (it) {
+        if (isOwned(s, g.cat, it.id)) n++;
+      });
+    });
+    return n;
+  }
+
+  function totalCustomizations() {
+    let n = 0;
+    allCustomizations().forEach(function (g) {
+      n += g.items.length;
+    });
+    return n;
+  }
+
+  /* Lifetime-stats panel shown above the achievement groups. */
+  function lifetimeStats(s) {
+    const st = s.stats;
+    const pk = st.pickups || {};
+    const rows = [
+      ["Total Score Earned", num(st.lifetimeScore)],
+      ["Total Money Earned", '<span class="money">' + fmt(st.lifetimeMoney) + "</span>"],
+      ["Money Spent in Store", '<span class="money">' + fmt(st.lifetimeSpent) + "</span>"],
+      ["Best Score in One Round", num(st.bestScore)],
+      ["Longest Run", fmtDur(st.bestTime)],
+      ["Total Play Time", fmtDur(st.totalTime)],
+      ["Rounds Played", num(st.runsPlayed)],
+      ["Asteroids Destroyed", num(st.asteroidsDestroyed)],
+      ["Shots Fired", num(st.bulletsFired)],
+      ["Asteroids Blasted by Shots", num(st.asteroidsByBullets)],
+      ["Damage Hits Taken", num(st.timesDowned)],
+      ["Ship Drops Opened", num(st.dropsBought)],
+      ["Dollar Bills Collected", num(pk.money)],
+      ["Reload Packs Found", num(pk.reload)],
+      ["Health Packs Found", num(pk.health)],
+      ["Slow-Mo Drops Found", num(pk.slow)],
+      ["Shrink Drops Found", num(pk.shrink)],
+      ["Screen Clears Found", num(pk.clear)]
+    ];
+    let html = '<div class="stats-head">Lifetime Stats</div><div class="stats-grid">';
+    rows.forEach(function (r) {
+      html += '<div class="stat-row"><span>' + r[0] + "</span><span>" + r[1] + "</span></div>";
+    });
+    return html + "</div>";
+  }
+
+  function fmtDur(sec) {
+    sec = Math.floor(sec || 0);
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return h + "h " + m + "m " + s + "s";
+    if (m > 0) return m + "m " + s + "s";
+    return s + "s";
   }
 
   /* ---------------- Toast (achievement + shop reveals) ---------------- */
@@ -309,13 +409,12 @@ window.UI = (function () {
   }
 
   /* ---------------- Customize screen ---------------- */
-  // Each "field" is a group of choices: Ship, Bullet, Background, Trail, Achievements.
+  // Each "field" is a group of choices: Ship, Bullet, Background, Trail.
   const FIELDS = [
     { key: "ship", name: "Character", type: "skins" },
     { key: "bullet", name: "Bullets", type: "skins" },
     { key: "background", name: "Background", type: "backgrounds" },
-    { key: "boost", name: "Trail", type: "skins" },
-    { key: "achievements", name: "Achievements", type: "achievements" }
+    { key: "boost", name: "Trail", type: "skins" }
   ];
   let activeField = 0;
 
@@ -356,17 +455,6 @@ window.UI = (function () {
   }
 
   function addOptions(grid, field, s) {
-    if (field.type === "achievements") {
-      // Non-interactive achievement list (image badges)
-      const list = document.createElement("div");
-      list.className = "ach-list";
-      DATA.achievements.forEach(function (a) {
-        list.appendChild(achItem(a, !!s.achievements[a.id]));
-      });
-      grid.appendChild(list);
-      return;
-    }
-
     const defs = skinDefs[field.key];
 
     if (field.key === "background") {
@@ -549,14 +637,16 @@ window.UI = (function () {
 
         const thumbs = document.createElement("div");
         thumbs.className = "p2-thumbs";
-        (s.owned[field.cat] || []).forEach(function (id) {
-          const def = field.defs.find(function (x) { return x.id === id; });
-          if (!def) return;
+        // Iterate the defs (id / customize-menu order) so every player sees the
+        // same layout as the Customize screen, then keep only what's owned.
+        field.defs.forEach(function (def) {
+          const owned = (s.owned[field.cat] || []).indexOf(def.id) > -1;
+          if (!owned) return;
           const thumb = document.createElement("div");
-          thumb.className = "p2-thumb" + (cfg[field.key] === id ? " selected" : "");
+          thumb.className = "p2-thumb" + (cfg[field.key] === def.id ? " selected" : "");
           thumb.title = def.name;
           thumb.dataset.pfield = field.key;
-          thumb.dataset.pid = id;
+          thumb.dataset.pid = def.id;
           const img = document.createElement("img");
           img.src = def.src;
           img.alt = def.name;
@@ -565,7 +655,7 @@ window.UI = (function () {
             P2_FOCUS[who] = Array.prototype.indexOf.call(
               thumb.closest(".p2-card").querySelectorAll(".p2-thumb"), thumb
             );
-            cfg[field.key] = id;
+            cfg[field.key] = def.id;
             buildP2Setup();
           });
           thumbs.appendChild(thumb);
@@ -654,6 +744,10 @@ window.UI = (function () {
   /* ---------------- helpers ---------------- */
   function fmt(n) {
     return "$" + Math.round(n).toLocaleString();
+  }
+
+  function num(n) {
+    return Math.round(n || 0).toLocaleString();
   }
 
   /* Generic achievement unlocker used across the whole game. */

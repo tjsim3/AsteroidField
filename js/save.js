@@ -33,7 +33,13 @@ window.SAVE = (function () {
         runsPlayed: 0,
         bestScore: 0,
         bestTime: 0,             // longest single run, in seconds
-        totalTime: 0             // total playing time, in seconds
+        totalTime: 0,            // total playing time, in seconds
+        bulletsFired: 0,         // lifetime shots fired
+        asteroidsByBullets: 0,   // lifetime asteroids blasted by your shots
+        timesDowned: 0,          // lifetime damage hits taken
+        pickups: {               // lifetime pickups found
+          money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0
+        }
       },
       achievements: {},          // { id: true } when unlocked
       settings: {
@@ -73,6 +79,14 @@ window.SAVE = (function () {
       const id = s.equipment[cat];
       if (id && s.owned[cat].indexOf(id) < 0) s.owned[cat].push(id);
     });
+    // Drop achievements that no longer exist, so legacy saves don't show
+    // phantom unlocks in the totals.
+    if (s.achievements) {
+      Object.keys(s.achievements).forEach(function (id) {
+        const def = DATA.achievements.find(function (a) { return a.id === id; });
+        if (!def) delete s.achievements[id];
+      });
+    }
   }
 
   function save() {
