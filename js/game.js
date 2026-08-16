@@ -448,9 +448,17 @@ window.Game = (function () {
       a.y += a.vy * slowMul * dt;
       a.rot += a.rotSpeed * dt;
 
-      // bounce off the top and bottom walls
-      if (a.y - a.r < 0) { a.y = a.r; a.vy = Math.abs(a.vy); }
-      if (a.y + a.r > H) { a.y = H - a.r; a.vy = -Math.abs(a.vy); }
+      // small/medium fragments sail off the edge instead of bouncing
+      if (a.size.key !== "big") {
+        if (a.y < -a.r || a.y > H + a.r) {
+          asteroids.splice(i, 1);
+          continue;
+        }
+      } else {
+        // big rocks bounce off the top and bottom walls
+        if (a.y - a.r < 0) { a.y = a.r; a.vy = Math.abs(a.vy); }
+        if (a.y + a.r > H) { a.y = H - a.r; a.vy = -Math.abs(a.vy); }
+      }
 
       if (a.x < -a.r - 10) {
         asteroids.splice(i, 1);
@@ -622,14 +630,25 @@ window.Game = (function () {
       const childKey = a.size.key === "big" ? "med" : (a.size.key === "med" ? "small" : null);
       if (childKey) {
         const child = ASTEROID_SIZES.find(function (s) { return s.key === childKey; });
+        // Fixed spawn instead of randomness: both children sit 1/3 of the
+        // width in from the parent's leftmost edge and 1/6 of the height
+        // above/below the parent's center. A bullet that hits the top-front
+        // or bottom-front of the rock also plows through the matching child.
+        const cx = a.x - a.r / 3;
         for (const side of [-1, 1]) {
+          // Blend of the old random scatter and the fixed stack: children stay
+          // roughly 1/3 of the width in from the left edge and stacked
+          // top/bottom, with a little wobble so repeated splits don't look
+          // identical. The boost keeps the fragments flinging apart quickly.
+          const wob = (Math.random() - 0.5) * child.r * 0.6;
+          const vy = side * (70 + child.speed * (0.5 + Math.random() * 0.3));
           asteroids.push({
-            x: a.x + side * child.r,
-            y: a.y + (Math.random() - 0.5) * child.r,
+            x: cx + wob,
+            y: a.y + side * (a.r / 3) + wob,
             r: child.r,
             size: child,
             vx: -child.speed * (0.8 + Math.random() * 0.4) * G.asteroidSpeedMul,
-            vy: side * (30 + Math.random() * 60),
+            vy: vy,
             rot: Math.random() * 6,
             rotSpeed: (Math.random() - 0.5) * 3
           });
