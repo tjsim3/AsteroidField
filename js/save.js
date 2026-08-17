@@ -27,7 +27,10 @@ window.SAVE = (function () {
       stats: {
         lifetimeMoney: 0,        // total cash collected from playing
         lifetimeSpent: 0,        // total cash spent in the store
-        dropsBought: 0,          // how many Shop drops have been opened (drives the price)
+        dropsBought: 0,          // how many Shop drops have been opened (any type)
+        dropCounts: {             // drops opened, per type (drives each price)
+          random: 0, ship: 0, bullet: 0, boost: 0, background: 0
+        },
         lifetimeScore: 0,        // total points ever scored
         asteroidsDestroyed: 0,   // lifetime
         runsPlayed: 0,

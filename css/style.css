@@ -666,28 +666,46 @@ html, body {
   margin-top: 20px;
 }
 
-/* Store grid + Drop chest */
+/* Store grid + Drop chests (one card per drop type, all in a single row) */
 .store-grid {
   display: flex;
+  flex-wrap: nowrap;
   justify-content: center;
+  align-items: stretch;
+  gap: 12px;
   padding: 4px 0 14px;
 }
 
 .drop-card {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 230px;
   background: rgba(20, 28, 70, 0.85);
   border: 3px solid #3d5aff;
   border-radius: 16px;
   box-shadow: 4px 4px 0 rgba(0,0,0,0.4);
-  padding: 20px 26px;
-  width: 280px;
+  padding: 14px 12px 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   text-align: center;
 }
 
-/* A simple golden chest drawn in CSS */
+/* Every drop type gets its own accent color. */
+.drop-card.dc-random     { border-color: #ffd23e; }
+.drop-card.dc-ship       { border-color: #6ea8ff; }
+.drop-card.dc-bullet     { border-color: #be86ff; }
+.drop-card.dc-boost      { border-color: #ff8a3d; }
+.drop-card.dc-background { border-color: #58e06c; }
+
+.drop-card.dc-random h3     { color: #ffe93a; }
+.drop-card.dc-ship h3       { color: #a7ccff; }
+.drop-card.dc-bullet h3     { color: #d6b6ff; }
+.drop-card.dc-boost h3      { color: #ffb27a; }
+.drop-card.dc-background h3 { color: #8ff0ab; }
+
+/* The classic golden chest - used for the Random drop and the reveal screen. */
 .drop-visual {
   position: relative;
   width: 104px;
@@ -724,13 +742,41 @@ html, body {
   border: 2px solid #1a1a2e;
 }
 
-.drop-card h3 { font-size: 22px; margin: 0; color: #ffffff; text-shadow: 2px 2px 0 #1a1a2e; }
+/* Base-item preview for the ship / bullet / boost / background drops */
+.drop-pic {
+  position: relative;
+  width: 104px;
+  height: 88px;
+  border-radius: 14px;
+  background: rgba(4, 8, 24, 0.85);
+  border: 4px solid #1a1a2e;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.drop-pic img {
+  max-width: 96%;
+  max-height: 96%;
+  object-fit: contain;
+  image-rendering: optimizeSpeed;
+}
+
+.drop-pic canvas {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+}
+
+.drop-card h3 { font-size: 18px; margin: 0; color: #ffffff; text-shadow: 2px 2px 0 #1a1a2e; }
 
 .drop-card p {
-  font-size: 13px;
+  font-size: 12px;
   color: #cfe4ff;
   line-height: 1.5;
-  min-height: 40px;
+  min-height: 34px;
 }
 
 .drop-card .price {

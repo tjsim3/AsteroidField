@@ -17,7 +17,6 @@ window.DATA = (function () {
     bulletPierce: 2,       // a bullet can punch through this many EXTRA asteroids
     moneyPerBill: 50,      // value of the dollar bill drop
     moneyPerAsteroid: 2,   // small reward for destroying an asteroid
-    chestPrice: 50,        // base price of one Shop drop (escalates with each purchase)
     asteroidSpeedMul: 1.45, // how much faster asteroids fly left
     scorePerSecond: 10     // score gained just for surviving (destroying rocks gives money, not points)
   };
@@ -253,11 +252,21 @@ window.DATA = (function () {
   };
 
   /* ---------- Helpers ---------- */
-  /* Shop drop price goes up the more drops have already been bought. */
-  function dropPrice(boughtCount) {
-    const n = boughtCount || 0;
-    return Math.round(GAME.chestPrice * (1 + 0.5 * n));
+  /* Shop drop types: each has its own base price and a price rise per drop
+     opened of that type. "random" pulls from any category. */
+  const DROPS = {
+    random:     { name: "Random Drop",      base: 200, inc: 50 },
+    ship:       { name: "Ship Drop",        base: 250, inc: 60 },
+    bullet:     { name: "Bullet Drop",      base: 300, inc: 75 },
+    boost:      { name: "Boost Drop",       base: 400, inc: 100 },
+    background: { name: "Background Drop",  base: 400, inc: 100 }
+  };
+  const DROP_ORDER = ["random", "ship", "bullet", "boost", "background"];
+
+  function dropPrice(type, count) {
+    const d = DROPS[type];
+    return d.base + d.inc * (count || 0);
   }
 
-  return { GAME, ships, bullets, trails, backgrounds, powerups, achievements, menuButtons, tips, hud, dropIcons, SPREAD, dropPrice };
+  return { GAME, ships, bullets, trails, backgrounds, powerups, achievements, menuButtons, tips, hud, dropIcons, SPREAD, dropPrice, DROPS, DROP_ORDER };
 })();

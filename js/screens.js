@@ -144,7 +144,7 @@ window.UI = (function () {
       ["Shots Fired", num(st.bulletsFired)],
       ["Asteroids Blasted by Shots", num(st.asteroidsByBullets)],
       ["Damage Hits Taken", num(st.timesDowned)],
-      ["Ship Drops Opened", num(st.dropsBought)],
+      ["Shop Drops Opened", num(st.dropsBought)],
       ["Dollar Bills Collected", num(pk.money)],
       ["Reload Packs Found", num(pk.reload)],
       ["Health Packs Found", num(pk.health)],
@@ -204,7 +204,8 @@ window.UI = (function () {
     return (s.owned[cat] || []).indexOf(id) > -1;
   }
 
-  /* Everything still missing from the collection. */
+  /* Everything still missing from the collection for one drop type.
+   "random" means any category. */
   function customizationPool(s) {
     const pool = [];
     allCustomizations().forEach(function (group) {
@@ -217,39 +218,105 @@ window.UI = (function () {
     return pool;
   }
 
+  /* Human label + how many skins remain for a category (drives the card text). */
+  const CAT_NAMES = { ship: "a ship", bullet: "a bullet", boost: "a boost trail", background: "a background" };
+
+  function poolFor(s, type) {
+    return type === "random"
+      ? customizationPool(s)
+      : customizationPool(s).filter(function (p) { return p.cat === type; });
+  }
+
   function buildStore() {
     const grid = $("store-grid");
     if (!grid) return;
     grid.innerHTML = "";
     const s = save.load();
-    const pool = customizationPool(s);
-    const bought = s.stats.dropsBought || 0;
-    const price = DATA.dropPrice(bought);
-    const canAfford = freeDrops || s.money >= price;
-    const nextPrice = DATA.dropPrice(bought + 1);
 
-    const card = document.createElement("div");
-    card.className = "drop-card";
-    card.innerHTML =
-      '<div class="drop-visual"></div>' +
-      '<h3>Drop</h3>' +
-      '<p>' + (pool.length
-        ? "A mystery chest with a random skin inside. " + pool.length + " skin" + (pool.length === 1 ? "" : "s") + " left, and every drop costs a little more!"
-        : "You have collected every customization!") + '</p>' +
-      '<span class="price">' + (freeDrops ? "FREE" : fmt(price)) + '</span>' +
-      (pool.length && !freeDrops && nextPrice > price ? '<span class="price-toast">next: ' + fmt(nextPrice) + '</span>' : '') +
-      '<button class="buy-btn" ' + (!canAfford || !pool.length ? 'disabled' : '') + '>Open Chest</button>';
+    DATA.DROP_ORDER.forEach(function (type) {
+      const pool = poolFor(s, type);
+      const count = s.stats.dropCounts[type] || 0;
+      const price = DATA.dropPrice(type, count);
+      const nextPrice = DATA.dropPrice(type, count + 1);
+      const canAfford = freeDrops || s.money >= price;
+      const def = DATA.DROPS[type];
 
-    card.querySelector(".buy-btn").addEventListener("click", openDrop);
-    grid.appendChild(card);
+      const card = document.createElement("div");
+      card.className = "drop-card dc-" + type;
+
+      // Icon: the golden chest for the random drop, otherwise a preview of the
+      // base item that drop will hand out (ship / shot / trail / background).
+      const pic = type === "random"
+        ? (function () {
+            const d = document.createElement("div");
+            d.className = "drop-visual";
+            return d;
+          })()
+        : basePreview(type);
+      card.appendChild(pic);
+
+      const title = document.createElement("h3");
+      title.textContent = def.name;
+      card.appendChild(title);
+
+      const desc = document.createElement("p");
+      desc.textContent = pool.length
+        ? type === "random"
+            ? "A mystery chest with any skin inside. " + pool.length +
+              " skin" + (pool.length === 1 ? "" : "s") + " missing total!"
+            : "Guaranteed to hold " + CAT_NAMES[type] + ". " + pool.length +
+              " still missing from this category."
+        : "You have collected every " +
+          (type === "random" ? "customization" : def.name.toLowerCase().replace(/ drop$/, "").replace("bullet", "shot")) +
+          "!";
+      card.appendChild(desc);
+
+      const priceEl = document.createElement("span");
+      priceEl.className = "price";
+      priceEl.textContent = freeDrops ? "FREE" : fmt(price);
+      card.appendChild(priceEl);
+
+      const toast = document.createElement("span");
+      toast.className = "price-toast";
+      toast.textContent = pool.length && !freeDrops && nextPrice > price
+        ? "next: " + fmt(nextPrice)
+        : "\u00a0";
+      card.appendChild(toast);
+
+      const btn = document.createElement("button");
+      btn.className = "buy-btn";
+      btn.disabled = !canAfford || !pool.length;
+      btn.textContent = pool.length ? "Open Chest" : "Sold Out";
+      btn.addEventListener("click", function () { openDrop(type); });
+      card.appendChild(btn);
+
+      grid.appendChild(card);
+    });
+
     buildCollection(s);
   }
 
-  function openDrop() {
+  /* A preview of the base (default) item each drop category sells. */
+  function basePreview(type) {
+    const box = document.createElement("div");
+    box.className = "drop-pic";
+    if (type === "background") {
+      box.appendChild(bgCanvas(DATA.backgrounds[0], 64));
+    } else {
+      const defs = type === "ship" ? DATA.ships : (type === "bullet" ? DATA.bullets : DATA.trails);
+      const img = document.createElement("img");
+      img.src = defs[0].src;
+      img.alt = defs[0].name;
+      box.appendChild(img);
+    }
+    return box;
+  }
+
+  function openDrop(type) {
     const s = save.load();
-    const pool = customizationPool(s);
-    const bought = s.stats.dropsBought || 0;
-    const price = DATA.dropPrice(bought);
+    const pool = poolFor(s, type);
+    const count = s.stats.dropCounts[type] || 0;
+    const price = DATA.dropPrice(type, count);
 
     if (!pool.length) return;
     if (!freeDrops && s.money < price) return;
@@ -258,7 +325,8 @@ window.UI = (function () {
       s.money -= price;
       s.stats.lifetimeSpent += price;
     }
-    s.stats.dropsBought = bought + 1;
+    s.stats.dropCounts[type] = count + 1;
+    s.stats.dropsBought = (s.stats.dropsBought || 0) + 1;
 
     const pick = pool[(Math.random() * pool.length) | 0];
     s.owned[pick.cat].push(pick.item.id);
@@ -271,8 +339,7 @@ window.UI = (function () {
     showReveal(pick);
 
     // "Buy all the items" achievement: the collection is complete
-    const done = customizationPool(s).length === 0;
-    if (done) unlock("buy_all");
+    if (customizationPool(s).length === 0) unlock("buy_all");
   }
 
   /* Installed-collection grid under the chest. */
