@@ -189,39 +189,29 @@ window.DATA = (function () {
     a.desc = a.name;
   });
 
-  /* ---------- Main menu button images ---------- */
-  const menuButtons = {
-    play: "MenuButtons/costume1.svg",
-    multiplayer: "MenuButtons/costume6.svg",
-    store: "MenuButtons/costume2.svg",
-    customize: "MenuButtons/costume3.svg",
-    achievements: "MenuButtons/costume5.svg"
-  };
-
-  /* ---------- Pro tips (black hint bars from the original) ---------- */
+  /* ---------- Pro tips (shown as text on the main menu) ---------- */
   const tips = [
-    "costume1.svg",
-    "costume2.svg",
-    "costume3.svg",
-    "costume5.svg",
-    "costume6.svg",
-    "costume7.svg",
-    "costume9.svg",
-    "costume10.svg",
-    "costume11.svg",
-    "costume12.svg",
-    "costume13.svg",
-    "costume14.svg",
-    "costume15.svg",
-    "costume16.svg",
-    "costume17.svg",
-    "costume18.svg",
-    "costume19.svg",
-    "costume20.svg",
-    "costume21.svg"
-  ].map(function (file, i) {
-    return { id: "tip-" + (i + 1), src: "ProTips/" + file };
-  });
+    "Your bullets are worth using - every rock they hit adds score.",
+    "Don't grab a bullet or health pack when you're full - it's wasted.",
+    "Big rocks split twice, small rocks don't split.",
+    "Bullets punch straight through every rock they hit.",
+    "Shoot where you plan to fly to clear your path.",
+    "Big wrecks pay $3, mediums $2, smalls pay $1.",
+    "A health pack at full health turns into $10.",
+    "Dollar bills are worth $50 and raise your score.",
+    "Survival scores too: 10 points each second alive.",
+    "Slow-Mo slows the rocks, not you - cross now.",
+    "Bills fade late in a run - power-ups take over.",
+    "Save your bullets for when you need them most.",
+    "Screen Clear pays points but holds back the cash.",
+    "Dead-center hits destroy the pieces that split off.",
+    "Bullets that chain rocks keep a combo going - chase the x2, x3...",
+    "You earn 3/4 of your points back as money after each round.",
+    "Use your second of recovery to get out of the way.",
+    "Grab every dollar bill you can - it banks to real cash.",
+    "Bullets and health usually show up in groups - look for a second.",
+    "You can squeeze through small gaps if you keep moving."
+  ];
 
   /* ---------- HUD images (score digits + bullet dots + fade effect) ---------- */
   const hud = {
@@ -268,5 +258,5 @@ window.DATA = (function () {
     return d.base + d.inc * (count || 0);
   }
 
-  return { GAME, ships, bullets, trails, backgrounds, powerups, achievements, menuButtons, tips, hud, dropIcons, SPREAD, dropPrice, DROPS, DROP_ORDER };
+  return { GAME, ships, bullets, trails, backgrounds, powerups, achievements, tips, hud, dropIcons, SPREAD, dropPrice, DROPS, DROP_ORDER };
 })();

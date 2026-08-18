@@ -27,6 +27,8 @@ window.Game = (function () {
     bulletsFired: 0,
     asteroidsDestroyed: 0,
     asteroidsByBullets: 0,
+    maxCombo: 0,          // highest combo a single bullet reached this run
+    comboKills: 0,        // asteroids hit by bullets already on a combo (&ge;2)
     cashBills: 0,        // $ from dollar-bill pickups
     cashWrecks: 0,       // $ from destroyed asteroids
     cashBonus: 0,        // $ from full-health pickups
@@ -41,6 +43,7 @@ window.Game = (function () {
   let bullets = [];
   let asteroids = [];
   let powerups = [];
+  let comboGhosts = [];    // faded combo labels that outlive their bullet (3s)
 
   // ---------- timers / status ----------
   let slowT = 0;
@@ -49,6 +52,7 @@ window.Game = (function () {
   let powerupCd = 2.5;
   let lastScore = -1;
   let lastOpts = {};       // the options the current run was started with
+  let bulletId = 0;        // stable id per bullet (drives combo list keys & pulse)
 
   // ---------- background ----------
   let bgStars = [];
@@ -236,6 +240,7 @@ window.Game = (function () {
     bullets = [];
     asteroids = [];
     powerups = [];
+    comboGhosts = [];
 
     runTime = 0;
     score = 0;
@@ -244,6 +249,8 @@ window.Game = (function () {
       bulletsFired: 0,
       asteroidsDestroyed: 0,
       asteroidsByBullets: 0,
+      maxCombo: 0,
+      comboKills: 0,
       cashBills: 0,
       cashWrecks: 0,
       cashBonus: 0,
@@ -433,11 +440,31 @@ window.Game = (function () {
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
       b.x += b.vx * dt;
+      b.comboPop = Math.max(0, b.comboPop - dt);
       if (b.x > W + 40) {
+        // keep its combo badge on screen for a slow 3-second fade-out;
+        // clamp x inside the edge so the label is actually visible
+        if (b.combo >= 2) {
+          comboGhosts.push({
+            x: Math.min(b.x, W - 72),
+            y: b.y,
+            combo: b.combo,
+            t: 3,
+            bid: b.bid
+          });
+        }
         bullets.splice(i, 1);
         continue;
       }
       hitsAsteroid(i, b);
+    }
+
+    // ---- combo ghosts: linger then fade ----
+    for (let i = comboGhosts.length - 1; i >= 0; i--) {
+      const g = comboGhosts[i];
+      g.t -= dt;
+      g.y -= 14 * dt;        // drift up a touch while it fades
+      if (g.t <= 0) comboGhosts.splice(i, 1);
     }
 
     // ---- asteroids ----
@@ -521,6 +548,10 @@ window.Game = (function () {
       const a = asteroids[ai];
       if (circleHit(b.x, b.y, b.r, a.x, a.y, a.r)) {
         // bullets punch straight through every rock until they leave the screen
+        b.combo++;
+        b.comboPop = 0.15;   // pop the combo label on the next frame
+        if (b.combo > runStats.maxCombo) runStats.maxCombo = b.combo;
+        if (b.combo >= 2) runStats.comboKills++;
         destroyAsteroid(a, false);
         return;
       }
@@ -565,6 +596,9 @@ window.Game = (function () {
       vx: 1050,
       r: 24,
       hits: 0,
+      bid: ++bulletId,
+      combo: 0,        // how many asteroids THIS bullet has punched through
+      comboPop: 0,     // seconds since the last combo bump (drives the pop)
       skin: p.bullet   // this player's chosen shot skin
     });
     FX.muzzleFlash(p.x + 24, p.y);
@@ -831,6 +865,7 @@ window.Game = (function () {
     save.stats.asteroidsByBullets = (save.stats.asteroidsByBullets || 0) + runStats.asteroidsByBullets;
     save.stats.timesDowned = (save.stats.timesDowned || 0) +
       players.reduce(function (sum, p) { return sum + p.damageTaken; }, 0);
+    save.stats.bestCombo = Math.max(save.stats.bestCombo || 0, runStats.maxCombo);
     const pk = save.stats.pickups = save.stats.pickups || {};
     ["money", "reload", "health", "slow", "shrink", "clear"].forEach(function (k) {
       pk[k] = (pk[k] || 0) + runStats.pickups[k];
@@ -893,6 +928,8 @@ window.Game = (function () {
         '<div><span>Asteroids Destroyed</span><span>' + st.asteroidsDestroyed + '</span></div>' +
         '<div><span>Blasted by Your Shots</span><span>' + st.asteroidsByBullets + '</span></div>' +
         '<div><span>Kills Per Shot</span><span>' + kps.toFixed(2) + '</span></div>' +
+        '<div><span>Best Shot Combo</span><span class="combo-stat">x' + st.maxCombo + '</span></div>' +
+        '<div><span>Asteroids in Combos</span><span>' + st.comboKills + '</span></div>' +
       '</div>' +
 
       '<div class="gameover-section">Collectibles</div>' +
@@ -957,7 +994,60 @@ window.Game = (function () {
       const bRot = bDef ? bDef.rot : -90;
       const bs = 44 / Math.max(bNatW, bNatH);
       drawImg(bulletImg, b.x, b.y, bNatW * bs, bNatH * bs, bRot);
+
+      // per-bullet combo badge: floats above the bullet, pops on each hit
+      if (b.combo >= 2) {
+        const label = "x" + b.combo;
+        const size = 20 + Math.min(10, b.combo);
+        const color = b.combo >= 6 ? "#ff4d4d" : b.combo >= 4 ? "#ff9300" : "#ffe93a";
+
+        // pop: overshoot to ~1.9x then settle, with a little wobble + kick up
+        const k = Math.min(1, b.comboPop / 0.15);
+        const pop = k > 0
+          ? 1 + 0.9 * k * k
+          : 1 + 0.06 * Math.sin(runTime * 6 + b.bid);   // idle breathing
+        const kick = k > 0 ? -12 * k : 0;
+        const wob = k > 0 ? Math.sin(k * Math.PI * 2.5) * 6 * k : 0;
+        const lw = 3 + size * 0.12;
+
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.scale(pop, pop);
+        ctx.rotate((wob * Math.PI) / 180);
+        ctx.translate(0, kick - 32);
+        ctx.textAlign = "center";
+        ctx.font = "900 " + size + "px Segoe UI, Arial, sans-serif";
+        ctx.strokeStyle = "rgba(0,0,0,0.75)";
+        ctx.lineWidth = lw;
+        ctx.lineJoin = "round";
+        ctx.strokeText(label, 0, 0);
+        ctx.fillStyle = color;
+        ctx.fillText(label, 0, 0);
+        ctx.restore();
+      }
     }
+
+    // ---- combo ghosts: the bullet is gone, the badge fades out slowly ----
+    for (const g of comboGhosts) {
+      const k = Math.max(0, g.t / 3);          // 1 -> 0 over 3 seconds
+      const alpha = Math.pow(k, 1.6);          // holds bright, eases out near the end
+      const label = "x" + g.combo;
+      const size = (20 + Math.min(10, g.combo)) * (0.8 + 0.2 * k);
+      const color = g.combo >= 6 ? "#ff4d4d" : g.combo >= 4 ? "#ff9300" : "#ffe93a";
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(g.x, g.y);
+      ctx.textAlign = "center";
+      ctx.font = "900 " + size + "px Segoe UI, Arial, sans-serif";
+      ctx.strokeStyle = "rgba(0,0,0,0.75)";
+      ctx.lineWidth = 3 + size * 0.12;
+      ctx.lineJoin = "round";
+      ctx.strokeText(label, 0, -32);
+      ctx.fillStyle = color;
+      ctx.fillText(label, 0, -32);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
 
     // ---- player trails (always on) ----
     players.forEach(function (p) {
@@ -1120,6 +1210,28 @@ window.Game = (function () {
     }
 
     moneyEl.textContent = "$" + runCash;
+    updateComboList();
+  }
+
+  /* Bottom-left list of every active bullet's combo, biggest first.
+   Only rewrites the DOM when something actually changed. */
+  function updateComboList() {
+    const host = document.getElementById("hud-combos");
+    if (!host) return;
+    const rows = bullets
+      .filter(function (b) { return b.combo >= 2; })
+      .map(function (b) { return { bid: b.bid, combo: b.combo }; })
+      .concat(comboGhosts.map(function (g) { return { bid: g.bid, combo: g.combo }; }))
+      .sort(function (a, b) { return b.combo - a.combo || a.bid - b.bid; });
+    const key = rows.map(function (r) { return r.bid + ":" + r.combo; }).join(",");
+    if (host._key === key) return;
+    host._key = key;
+    let html = "";
+    rows.forEach(function (r) {
+      const cls = r.combo >= 6 ? "c-hot" : r.combo >= 4 ? "c-warm" : "";
+      html += '<div class="combo-chip ' + cls + '">COMBO x' + r.combo + '</div>';
+    });
+    host.innerHTML = html;
   }
 
   // =====================================================

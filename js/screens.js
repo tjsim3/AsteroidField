@@ -30,10 +30,10 @@ window.UI = (function () {
     if (!DATA.tips.length) return;
     const tip = DATA.tips[(Math.random() * DATA.tips.length) | 0];
     box.innerHTML = "";
-    const img = document.createElement("img");
-    img.src = tip.src;
-    img.alt = "Pro tip";
-    box.appendChild(img);
+    const text = document.createElement("div");
+    text.className = "tip-text";
+    text.textContent = tip;
+    box.appendChild(text);
     clearTimeout(tipTimer);
     tipTimer = setTimeout(setTip, 8000);   // rotate tips every few seconds
   }
@@ -144,6 +144,7 @@ window.UI = (function () {
       ["Shots Fired", num(st.bulletsFired)],
       ["Asteroids Blasted by Shots", num(st.asteroidsByBullets)],
       ["Damage Hits Taken", num(st.timesDowned)],
+      ["Best Shot Combo", '<span class="combo-stat">x' + (st.bestCombo || 0) + "</span>"],
       ["Shop Drops Opened", num(st.dropsBought)],
       ["Dollar Bills Collected", num(pk.money)],
       ["Reload Packs Found", num(pk.reload)],

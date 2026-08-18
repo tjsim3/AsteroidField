@@ -100,22 +100,6 @@ window.INPUT = { keys: {} };
     }
   }
 
-  /* The menu buttons ARE images. Point each button at its sprite. */
-  function setMenuButtonImages() {
-    const mapping = {
-      "btn-play": DATA.menuButtons.play,
-      "btn-play2": DATA.menuButtons.multiplayer,
-      "btn-store": DATA.menuButtons.store,
-      "btn-customize": DATA.menuButtons.customize,
-      "btn-achievements": DATA.menuButtons.achievements
-    };
-    Object.keys(mapping).forEach(function (id) {
-      const btn = $(id);
-      if (!btn) return;
-      btn.style.backgroundImage = 'url("' + mapping[id] + '")';
-    });
-  }
-
   /* ---------------- button wiring ---------------- */
   $("btn-play").addEventListener("click", function () {
     fadeTransition(function () {
@@ -234,7 +218,6 @@ window.INPUT = { keys: {} };
   Game.init();
   UI.applySettings(SAVE.load().settings);
   UI.applyTheme();
-  setMenuButtonImages();
   scatterStars($("menu-stars"));
   scatterStars($("store-stars"));
   scatterStars($("customize-stars"));
@@ -243,9 +226,8 @@ window.INPUT = { keys: {} };
   scatterStars($("settings-stars"));
 
   // preload every sprite in the background (the menu shows right away);
-  // when it's done, refresh the menu buttons and stats
+  // when it's done, refresh the menu stats
   ASSETS.preloadAll().then(function () {
-    setMenuButtonImages();
     UI.updateMenuStats();
   });
 

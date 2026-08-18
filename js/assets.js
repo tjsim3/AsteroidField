@@ -40,9 +40,7 @@ window.ASSETS = (function () {
     srcs.push("AsteroidsAndPowerups/Money.svg");
     srcs.push(DATA.SPREAD.asteroid, DATA.SPREAD.explosion, DATA.SPREAD.healFx);
 
-    // menu, tips, HUD, achievements + store icons
-    Object.values(DATA.menuButtons).forEach(p => srcs.push(p));
-    DATA.tips.forEach(t => srcs.push(t.src));
+    // HUD, achievements + store icons
     Object.values(DATA.hud.digitFiles).forEach(p => srcs.push(p));
     srcs.push(DATA.hud.bulletDot, DATA.hud.fade);
     DATA.achievements.forEach(a => srcs.push(a.src));

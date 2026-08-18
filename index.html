@@ -17,11 +17,11 @@
         <p class="tagline">The game of dodging asteroids!</p>
 
         <div class="menu-buttons">
-          <button id="btn-play" class="menu-btn"></button>
-          <button id="btn-play2" class="menu-btn"></button>
-          <button id="btn-store" class="menu-btn"></button>
-          <button id="btn-customize" class="menu-btn"></button>
-          <button id="btn-achievements" class="menu-btn"></button>
+          <button id="btn-play" class="menu-btn play-btn">PLAY</button>
+          <button id="btn-play2" class="menu-btn multi-btn">2-PLAYER</button>
+          <button id="btn-store" class="menu-btn store-btn">STORE</button>
+          <button id="btn-customize" class="menu-btn customize-btn">CUSTOMIZE</button>
+          <button id="btn-achievements" class="menu-btn ach-btn">ACHIEVEMENTS</button>
           <button id="btn-settings" class="menu-link">Settings</button>
         </div>
 
@@ -51,6 +51,7 @@
           <div class="hud-row"><span class="label">Score</span><span id="hud-score" class="score-digits"></span></div>
           <div class="hud-row"><span class="label">Cash</span><span id="hud-money" class="money">$0</span></div>
         </div>
+        <div id="hud-combos" class="hud-combos"></div>
       </div>
 
       <!-- Pause overlay -->
