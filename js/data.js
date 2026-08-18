@@ -141,7 +141,6 @@ window.DATA = (function () {
   const powerups = [
     /* weight makes some drops show up more often than others */
     { id: "reload", name: "Bullet Drop", desc: "The green circle gives you +3 bullets when collected.", icon: "AsteroidsAndPowerups/Reload.svg", weight: 3 },
-    { id: "health", name: "Health Drop", desc: "The battery heals +1 life. Full? You get cash instead.", icon: "AsteroidsAndPowerups/Health.svg", weight: 1 },
     { id: "slow", name: "Slow Drop", desc: "Slow-motion! All asteroids move at half speed for 6 seconds.", icon: "AsteroidsAndPowerups/SlowDown.svg", weight: 1 },
     { id: "shrink", name: "Shrink Drop", desc: "Shrink your ship so you are harder to hit, for 6 seconds.", icon: "AsteroidsAndPowerups/Shrink.svg", weight: 1 },
     { id: "clear", name: "Screen Clear", desc: "A mighty blast destroys every asteroid on screen. Ka-boom!", icon: "AsteroidsAndPowerups/ClearScreen2.svg", weight: 1 }
@@ -181,6 +180,17 @@ window.DATA = (function () {
     { id: "destroy_10000", file: "a-destroy-10000.svg", name: "Destroy 10000 Asteroids", group: "Asteroids Destroyed", track: "asteroidsDestroyed", goal: 10000 },
     { id: "destroy_25000", file: "a-destroy-25000.svg", name: "Destroy 25000 Asteroids", group: "Asteroids Destroyed", track: "asteroidsDestroyed", goal: 25000 },
 
+    // Total combos, accumulated (a x13 and a x7 add 20) - tracked live
+    { id: "combos_500",  file: "a-combos-500.svg",  name: "500 Total Combos",  group: "Total Combos", track: "comboTotal", goal: 500 },
+    { id: "combos_1000", file: "a-combos-1000.svg", name: "1,000 Total Combos", group: "Total Combos", track: "comboTotal", goal: 1000 },
+    { id: "combos_5000", file: "a-combos-5000.svg", name: "5,000 Total Combos", group: "Total Combos", track: "comboTotal", goal: 5000 },
+
+    // Longest single-bullet combo
+    { id: "long_10", file: "a-long-10.svg", name: "Longest Combo 10x", group: "Longest Combo", track: "bestCombo", goal: 10 },
+    { id: "long_20", file: "a-long-20.svg", name: "Longest Combo 20x", group: "Longest Combo", track: "bestCombo", goal: 20 },
+    { id: "long_30", file: "a-long-30.svg", name: "Longest Combo 30x", group: "Longest Combo", track: "bestCombo", goal: 30 },
+    { id: "long_40", file: "a-long-40.svg", name: "Longest Combo 40x", group: "Longest Combo", track: "bestCombo", goal: 40 },
+
     // Staples
     { id: "buy_all", file: "a-buy-all.svg", name: "Buy All the Items", group: "Staples", track: "buyall", goal: 1 }
   ];
@@ -197,7 +207,7 @@ window.DATA = (function () {
     "Bullets punch straight through every rock they hit.",
     "Shoot where you plan to fly to clear your path.",
     "Big wrecks pay $3, mediums $2, smalls pay $1.",
-    "A health pack at full health turns into $10.",
+    "A health pack flies by every 30 seconds - grab it to heal +1 (each pack arrives a second later than the last).",
     "Dollar bills are worth $50 and raise your score.",
     "Survival scores too: 10 points each second alive.",
     "Slow-Mo slows the rocks, not you - cross now.",
@@ -209,7 +219,7 @@ window.DATA = (function () {
     "You earn 3/4 of your points back as money after each round.",
     "Use your second of recovery to get out of the way.",
     "Grab every dollar bill you can - it banks to real cash.",
-    "Bullets and health usually show up in groups - look for a second.",
+    "Power-ups usually show up in groups - look for a second.",
     "You can squeeze through small gaps if you keep moving."
   ];
 

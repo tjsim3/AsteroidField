@@ -20,7 +20,6 @@
           <button id="btn-play" class="menu-btn play-btn">PLAY</button>
           <button id="btn-play2" class="menu-btn multi-btn">2-PLAYER</button>
           <button id="btn-store" class="menu-btn store-btn">STORE</button>
-          <button id="btn-customize" class="menu-btn customize-btn">CUSTOMIZE</button>
           <button id="btn-achievements" class="menu-btn ach-btn">ACHIEVEMENTS</button>
           <button id="btn-settings" class="menu-link">Settings</button>
         </div>
@@ -32,10 +31,12 @@
         <p class="how-to">
           <strong>How to play:</strong>
           Up / Down (or W / S) to move, Space (or Shift) to shoot.
-          Grab dollar bills (+$50), bullets and health packs!
+          Grab dollar bills (+$50), bullets and power-ups! A glowing health
+          pack flies by every 30 seconds - grab it to heal +1 (each pack
+          arrives a second later than the last).
           Multiplayer: Player 1 = W/S + Shift &middot; Player 2 = Arrows + Space.
         </p>
-        <p class="small-note">Tip: hold the Up arrow and click Customize to reset your account.</p>
+        <p class="small-note">Tip: open Drops in the Store to collect skins, then click a collected skin to equip it.</p>
       </div>
     </section>
 
@@ -106,22 +107,9 @@
           <h2>STORE</h2>
           <span id="store-money" class="money-big">$0</span>
         </header>
-        <p class="screen-sub">Open a <strong>Drop</strong> to find a new skin. Pick the random mystery chest, or a guaranteed slot: ship, shot, trail or background. Every chest of a kind costs a little more than the last.</p>
+        <p class="screen-sub">Open a <strong>Drop</strong> to find a new skin. Pick the random mystery chest, or a guaranteed slot: ship, shot, trail or background. Every chest of a kind costs a little more than the last. Click any collected skin below to equip it!</p>
         <div id="store-grid" class="store-grid"></div>
         <div id="store-collection" class="store-collection"></div>
-      </div>
-    </section>
-
-    <!-- ============ CUSTOMIZE SCREEN ============ -->
-    <section id="screen-customize" class="screen hidden">
-      <div id="customize-stars" class="screen-stars" aria-hidden="true"></div>
-      <div class="screen-panel">
-        <header class="screen-header">
-          <button id="customize-back" class="back-btn">&larr; Back</button>
-          <h2>CUSTOMIZE</h2>
-        </header>
-        <p class="screen-sub">Press <strong>Space</strong> to jump to the next group of options. <strong>Click</strong> to choose a skin. Locked items are found by opening Drops in the Store!</p>
-        <div id="customize-fields" class="customize-fields"></div>
       </div>
     </section>
 

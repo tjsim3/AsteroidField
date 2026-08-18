@@ -2,7 +2,7 @@
    main.js - ties everything together
 
    - tracks keyboard input (shared with the game)
-   - switches between the Menu / Game / Store / Customize
+   - switches between the Menu / Game / Store / Achievements
      screens
    - wires up every button on the page
    ===================================================== */
@@ -126,20 +126,6 @@ window.INPUT = { keys: {} };
     showScreen("screen-store");
   });
 
-  $("btn-customize").addEventListener("click", function () {
-    // Secret(ish) reset: hold the Up arrow and click Customize
-    if (INPUT.keys["arrowup"] || INPUT.keys.w) {
-      const sure = window.confirm("Reset your entire account? This cannot be undone!");
-      if (sure) {
-        SAVE.reset();
-        window.location.reload();
-      }
-      return;
-    }
-    UI.buildCustomize();
-    showScreen("screen-customize");
-  });
-
   $("btn-achievements").addEventListener("click", function () {
     UI.buildAchievements();
     showScreen("screen-achievements");
@@ -151,7 +137,6 @@ window.INPUT = { keys: {} };
   });
 
   $("store-back").addEventListener("click", goToMenu);
-  $("customize-back").addEventListener("click", goToMenu);
   $("achievements-back").addEventListener("click", goToMenu);
   $("settings-back").addEventListener("click", goToMenu);
 
@@ -186,16 +171,6 @@ window.INPUT = { keys: {} };
     });
   });
 
-  // Space advances to the next group of options on the Customize screen only
-  document.addEventListener("keydown", function (e) {
-    if (e.repeat) return;
-    if (e.key !== " " && e.key !== "Spacebar") return;
-    if (!$("screen-customize").classList.contains("hidden")) {
-      e.preventDefault();
-      UI.nextField();
-    }
-  });
-
   // Cheat code: type "FREE" on the Store screen to toggle free drops.
   let cheatBuf = "";
   document.addEventListener("keydown", function (e) {
@@ -220,7 +195,6 @@ window.INPUT = { keys: {} };
   UI.applyTheme();
   scatterStars($("menu-stars"));
   scatterStars($("store-stars"));
-  scatterStars($("customize-stars"));
   scatterStars($("achievements-stars"));
   scatterStars($("p2-stars"));
   scatterStars($("settings-stars"));

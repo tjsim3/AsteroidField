@@ -1,6 +1,7 @@
 /* =====================================================
-   screens.js - builds and controls the Menu, Store and
-   Customize screens + the achievement toast.
+   screens.js - builds and controls the Menu, Store,
+   Achievements, Multiplayer and Settings screens, plus
+   the achievement toast.
    ===================================================== */
 
 window.UI = (function () {
@@ -148,7 +149,7 @@ window.UI = (function () {
       ["Shop Drops Opened", num(st.dropsBought)],
       ["Dollar Bills Collected", num(pk.money)],
       ["Reload Packs Found", num(pk.reload)],
-      ["Health Packs Found", num(pk.health)],
+      ["Health Restores", num(pk.health)],
       ["Slow-Mo Drops Found", num(pk.slow)],
       ["Shrink Drops Found", num(pk.shrink)],
       ["Screen Clears Found", num(pk.clear)]
@@ -343,11 +344,17 @@ window.UI = (function () {
     if (customizationPool(s).length === 0) unlock("buy_all");
   }
 
-  /* Installed-collection grid under the chest. */
+  /* Installed-collection grid under the chest. Owned skins are buttons:
+     click one to equip it; the currently equipped skin gets a ring. */
   function buildCollection(s) {
     const box = $("store-collection");
     if (!box) return;
     box.innerHTML = "";
+    const hint = document.createElement("div");
+    hint.className = "coll-hint";
+    hint.textContent = "Click a collected skin to equip it";
+    box.appendChild(hint);
+
     allCustomizations().forEach(function (group) {
       const g = document.createElement("div");
       g.className = "coll-group";
@@ -357,9 +364,19 @@ window.UI = (function () {
       const chips = document.createElement("div");
       chips.className = "coll-chips";
       group.items.forEach(function (item) {
-        const chip = document.createElement("span");
-        if (isOwned(s, group.cat, item.id)) {
-          chip.className = "coll-chip";
+        const owned = isOwned(s, group.cat, item.id);
+        const chip = document.createElement("button");
+        chip.type = "button";
+        if (!owned) {
+          chip.className = "coll-chip locked";
+          chip.textContent = "?";
+          chip.title = "Locked - open a " + CAT_NAMES[group.cat] + " drop to unlock it";
+          chip.disabled = true;
+        } else {
+          const equipped = s.equipment[group.cat] === item.id;
+          chip.className = "coll-chip" + (equipped ? " equipped" : "");
+          chip.title = item.name + (equipped ? " (equipped)" : "");
+          chip.addEventListener("click", function () { equipSkin(group.cat, item); });
           if (group.cat === "background") {
             // Backgrounds are procedural (drawn), not image files.
             chip.appendChild(bgCanvas(item, 34));
@@ -369,15 +386,22 @@ window.UI = (function () {
             img.alt = item.name;
             chip.appendChild(img);
           }
-        } else {
-          chip.className = "coll-chip locked";
-          chip.textContent = "?";
         }
         chips.appendChild(chip);
       });
       g.appendChild(chips);
       box.appendChild(g);
     });
+  }
+
+  /* Equip a skin for its category and refresh the collection ring. */
+  function equipSkin(cat, item) {
+    const s = save.load();
+    if (s.equipment[cat] === item.id) return;
+    s.equipment[cat] = item.id;
+    save.save();
+    if (cat === "background") applyTheme();
+    buildCollection(s);
   }
 
   function updateStoreMoney() {
@@ -476,130 +500,9 @@ window.UI = (function () {
     }
   }
 
-  /* ---------------- Customize screen ---------------- */
-  // Each "field" is a group of choices: Ship, Bullet, Background, Trail.
-  const FIELDS = [
-    { key: "ship", name: "Character", type: "skins" },
-    { key: "bullet", name: "Bullets", type: "skins" },
-    { key: "background", name: "Background", type: "backgrounds" },
-    { key: "boost", name: "Trail", type: "skins" }
-  ];
-  let activeField = 0;
-
-  const skinDefs = {
-    ship: DATA.ships,
-    bullet: DATA.bullets,
-    boost: DATA.trails,
-    background: DATA.backgrounds
-  };
-
-  function buildCustomize() {
-    const wrap = $("customize-fields");
-    const s = save.load();
-    wrap.innerHTML = "";
-
-    FIELDS.forEach(function (field, fi) {
-      const box = document.createElement("div");
-      box.className = "field-box" + (fi === activeField ? " active" : "");
-      box.dataset.field = field.key;
-      box.id = "field-" + field.key;
-
-      // Header + click-to-jump
-      const head = document.createElement("div");
-      head.className = "field-head";
-      head.innerHTML =
-        '<h3>' + field.name + '</h3>' +
-        (fi === activeField ? '<span class="active-tag">ACTIVE</span>' : '');
-      head.addEventListener("click", function () { setActiveField(fi); });
-      box.appendChild(head);
-
-      const grid = document.createElement("div");
-      grid.className = "option-grid";
-      addOptions(grid, field, s);
-
-      box.appendChild(grid);
-      wrap.appendChild(box);
-    });
-  }
-
-  function addOptions(grid, field, s) {
-    const defs = skinDefs[field.key];
-
-    if (field.key === "background") {
-      // Backgrounds show a small moving-preview drawing instead of a file.
-      defs.forEach(function (bg, i) {
-        const owned = isOwned(s, field.key, bg.id);
-        const btn = document.createElement("div");
-        btn.className = "option canvas-opt" +
-          (s.equipment.background === bg.id ? " selected" : "") +
-          (owned ? "" : " locked");
-        const cv = document.createElement("canvas");
-        cv.width = 74;
-        cv.height = 74;
-        cv._bg = bg;
-        drawBackgroundPreview(cv, bg);
-        btn.appendChild(cv);
-        btn.title = bg.name;
-        btn.addEventListener("click", function () {
-          if (!owned) {
-            notify("Locked! Open a Shop drop to find this background.", null);
-            return;
-          }
-          s.equipment.background = bg.id;
-          save.save();
-          applyTheme();
-          setActiveFieldFor(field.key);
-        });
-        grid.appendChild(btn);
-      });
-    } else {
-      defs.forEach(function (item, i) {
-        const owned = isOwned(s, field.key, item.id);
-        const btn = document.createElement("div");
-        btn.className = "option" +
-          (s.equipment[field.key] === item.id ? " selected" : "") +
-          (owned ? "" : " locked");
-        const img = document.createElement("img");
-        img.src = item.src;
-        img.alt = item.name;
-        btn.appendChild(img);
-        const label = document.createElement("span");
-        label.className = "opt-name";
-        label.textContent = item.name;
-        btn.appendChild(label);
-        // Clicking any owned skin selects it (and jumps to its group).
-        btn.addEventListener("click", function () {
-          if (!owned) {
-            notify("Locked! Open a Shop drop to find this item.", null);
-            return;
-          }
-          s.equipment[field.key] = item.id;
-          save.save();
-          setActiveFieldFor(field.key);
-        });
-        grid.appendChild(btn);
-      });
-    }
-  }
-
-  /* Jump to the group that fits the given field key, then re-render. */
-  function setActiveFieldFor(fieldKey) {
-    const fi = FIELDS.findIndex(function (f) { return f.key === fieldKey; });
-    if (fi > -1) {
-      activeField = fi;
-    }
-    buildCustomize();
-  }
-
-  /* Cycle to the next group of options (Space key). */
-  function nextField() {
-    setActiveField((activeField + 1) % FIELDS.length);
-  }
-
-  function setActiveField(index) {
-    activeField = index;
-    buildCustomize();
-  }
+  /* ---------------- Customize is gone: skins are equipped right in
+   the Store's collection. Each owned skin is a button; clicking it
+   equips it for its category (backgrounds recolor every screen). */
 
   /* A ready-made canvas thumbnail of a procedural background. */
   function bgCanvas(bg, size) {
@@ -705,8 +608,8 @@ window.UI = (function () {
 
         const thumbs = document.createElement("div");
         thumbs.className = "p2-thumbs";
-        // Iterate the defs (id / customize-menu order) so every player sees the
-        // same layout as the Customize screen, then keep only what's owned.
+// Iterate the defs (id / store-menu order) so every player sees the
+      // same layout as the Store collection, then keep only what's owned.
         field.defs.forEach(function (def) {
           const owned = (s.owned[field.cat] || []).indexOf(def.id) > -1;
           if (!owned) return;
@@ -820,9 +723,10 @@ window.UI = (function () {
 
   /* Generic achievement unlocker used across the whole game. */
   function unlock(id) {
+    const def = DATA.achievements.find(function (a) { return a.id === id; });
+    if (!def) return;
     const s = save.load();
     if (s.achievements[id]) return;
-    const def = DATA.achievements.find(function (a) { return a.id === id; });
     s.achievements[id] = true;
     save.save();
     if (def) notify("Achievement unlocked: " + def.name, def.src);
@@ -910,7 +814,7 @@ window.UI = (function () {
      Canvases hidden inside a closed overlay report offsetWidth 0,
      so they're skipped until they become visible again. */
   function tickBGPreviews() {
-    document.querySelectorAll(".option-grid canvas, .coll-chips canvas, .reveal-item canvas")
+    document.querySelectorAll(".coll-chips canvas, .reveal-item canvas")
       .forEach(function (cv) {
         if (cv._bg && cv.offsetWidth > 0) {
           drawBackgroundPreview(cv, cv._bg);
@@ -921,8 +825,8 @@ window.UI = (function () {
   requestAnimationFrame(tickBGPreviews);
 
   return {
-    updateMenuStats, notify, setTip, buildStore, buildCustomize,
-    buildAchievements, nextField, setActiveField, unlock, updateStoreMoney, fmt,
+    updateMenuStats, notify, setTip, buildStore,
+    buildAchievements, unlock, updateStoreMoney, fmt,
     buildP2Setup, getP2Config,
     buildSettings, toggleSetting, applySettings, applyTheme,
     setFreeDrops: function (on) { freeDrops = on; buildStore(); },

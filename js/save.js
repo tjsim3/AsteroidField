@@ -41,6 +41,7 @@ window.SAVE = (function () {
         asteroidsByBullets: 0,   // lifetime asteroids blasted by your shots
         timesDowned: 0,          // lifetime damage hits taken
         bestCombo: 0,            // highest combo a single bullet ever reached
+        comboTotal: 0,           // total combo value accumulated (each finished combo adds its size)
         pickups: {               // lifetime pickups found
           money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0
         }

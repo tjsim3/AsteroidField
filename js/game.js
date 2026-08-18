@@ -28,6 +28,7 @@ window.Game = (function () {
     asteroidsDestroyed: 0,
     asteroidsByBullets: 0,
     maxCombo: 0,          // highest combo a single bullet reached this run
+    comboTotal: 0,        // combo values added up (a x13 and a x7 = +20)
     comboKills: 0,        // asteroids hit by bullets already on a combo (&ge;2)
     cashBills: 0,        // $ from dollar-bill pickups
     cashWrecks: 0,       // $ from destroyed asteroids
@@ -50,6 +51,8 @@ window.Game = (function () {
   let shrinkT = 0;
   let spawnCd = 1;
   let powerupCd = 2.5;
+  let healCd = 30;        // seconds until the next automatic +1 life
+  let healsDone = 0;      // completed auto-heals (each one adds 1s to the gap)
   let lastScore = -1;
   let lastOpts = {};       // the options the current run was started with
   let bulletId = 0;        // stable id per bullet (drives combo list keys & pulse)
@@ -263,6 +266,8 @@ window.Game = (function () {
     shrinkT = 0;
     spawnCd = 1.2;
     powerupCd = 2.5;
+    healCd = 30;
+    healsDone = 0;
 
     state = STATE.PLAYING;
     document.getElementById("gameover-overlay").classList.add("hidden");
@@ -436,6 +441,15 @@ window.Game = (function () {
       powerupCd = (5.6 + Math.random() * 4.4) * (1 - t * 0.35);
     }
 
+    // ---- health drop: a +1-life pickup flies by every 30s, and each drop
+    //      adds one more second before the next one (30, then 31, then 32...) ----
+    healCd -= dt;
+    if (healCd <= 0) {
+      healCd = 30 + healsDone;
+      healsDone++;
+      spawnHealthPickup();
+    }
+
     // ---- bullets ----
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
@@ -445,6 +459,7 @@ window.Game = (function () {
         // keep its combo badge on screen for a slow 3-second fade-out;
         // clamp x inside the edge so the label is actually visible
         if (b.combo >= 2) {
+          addComboTotal(b.combo);
           comboGhosts.push({
             x: Math.min(b.x, W - 72),
             y: b.y,
@@ -552,10 +567,22 @@ window.Game = (function () {
         b.comboPop = 0.15;   // pop the combo label on the next frame
         if (b.combo > runStats.maxCombo) runStats.maxCombo = b.combo;
         if (b.combo >= 2) runStats.comboKills++;
+        if (b.combo >= 2) UI.unlock("long_" + b.combo);
         destroyAsteroid(a, false);
         return;
       }
     }
+  }
+
+  /* Each finished combo (a bullet that punched through rocks) adds its size
+   to the lifetime accumulated-combo total; unlocks live when a goal is hit. */
+  const COMBO_TOTAL_ACH = [[500, "combos_500"], [1000, "combos_1000"], [5000, "combos_5000"]];
+  function addComboTotal(n) {
+    runStats.comboTotal += n;
+    const cumulative = SAVE.load().stats.comboTotal + runStats.comboTotal;
+    COMBO_TOTAL_ACH.forEach(function (c) {
+      if (cumulative >= c[0]) UI.unlock(c[1]);
+    });
   }
 
   /* Difficulty driver for asteroid spawn cadence.
@@ -739,11 +766,25 @@ window.Game = (function () {
   // =====================================================
   const PFX = {
     reload: { color: "#39ff5a", msg: "+3 Bullets" },
-    health: { color: "#ff6a8a", msg: "+1 Life" },
     slow: { color: "#b06bff", msg: "Slow-Mo!" },
     shrink: { color: "#ffe93a", msg: "Shrunk!" },
-    clear: { color: "#ff9300", msg: "SCREEN CLEAR!" }
+    clear: { color: "#ff9300", msg: "SCREEN CLEAR!" },
+    health: { color: "#ff5c6c", msg: "+1 Life" }
   };
+
+  /* Timer-driven health drop: flies across the screen every 30s (then 31s,
+   32s...) so you have to spot it and grab it. */
+  function spawnHealthPickup() {
+    powerups.push({
+      id: "health",
+      icon: "AsteroidsAndPowerups/Health.svg",
+      x: W + 60,
+      baseY: 50 + Math.random() * Math.max(1, H - 100),
+      y: 0,
+      vx: -160 - Math.random() * 40,   // a touch slower than other drops so it's easier to catch
+      t: Math.random() * 6
+    });
+  }
 
   function spawnPowerup() {
     // Money's spawn weight was cut to a third of what it used to be:
@@ -866,6 +907,7 @@ window.Game = (function () {
     save.stats.timesDowned = (save.stats.timesDowned || 0) +
       players.reduce(function (sum, p) { return sum + p.damageTaken; }, 0);
     save.stats.bestCombo = Math.max(save.stats.bestCombo || 0, runStats.maxCombo);
+    save.stats.comboTotal = (save.stats.comboTotal || 0) + runStats.comboTotal;
     const pk = save.stats.pickups = save.stats.pickups || {};
     ["money", "reload", "health", "slow", "shrink", "clear"].forEach(function (k) {
       pk[k] = (pk[k] || 0) + runStats.pickups[k];
@@ -936,7 +978,7 @@ window.Game = (function () {
       '<div class="gameover-grid">' +
         '<div><span>Dollar Bills</span><span>' + st.pickups.money + '</span></div>' +
         '<div><span>Reload Packs</span><span>' + st.pickups.reload + '</span></div>' +
-        '<div><span>Health Packs</span><span>' + st.pickups.health + '</span></div>' +
+        '<div><span>Health Restores</span><span>' + st.pickups.health + '</span></div>' +
         '<div><span>Slow-Mo</span><span>' + st.pickups.slow + '</span></div>' +
         '<div><span>Shrink</span><span>' + st.pickups.shrink + '</span></div>' +
         '<div><span>Screen Clears</span><span>' + st.pickups.clear + '</span></div>' +
@@ -973,7 +1015,19 @@ window.Game = (function () {
 
     // ---- power-ups ----
     for (const p of powerups) {
-      drawSprite(p.icon, p.x, p.y, 34, 34, 0);
+      if (p.id === "health") {
+        // pulsing halo + bigger sprite so the health drop stands out
+        const pulse = 0.5 + 0.5 * Math.sin(p.t * 5);
+        ctx.globalAlpha = 0.3 + 0.25 * pulse;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 30 + 9 * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = "#ff5c6c";
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        drawSprite(p.icon, p.x, p.y, 42, 42, 0);
+      } else {
+        drawSprite(p.icon, p.x, p.y, 34, 34, 0);
+      }
     }
 
     // ---- asteroids ----
