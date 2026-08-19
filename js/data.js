@@ -25,12 +25,16 @@ window.DATA = (function () {
   const shipFiles = [
     "0.svg", "1.svg", "2.svg", "3 (1).svg", "4.svg", "5.svg", "6.svg",
     "7.svg", "8.svg", "9.svg",
-    "costume1.svg", "costume2.svg", "costume3.svg", "costume4.svg", "costume5.svg"
+    "costume1.svg", "costume2.svg", "costume3.svg", "costume4.svg", "costume5.svg",
+    "costume6.svg", "costume7.svg", "costume8.svg", "costume9.svg",
+    "costume10.svg", "costume11.svg", "costume12.svg"
   ];
 
   const SHIP_NAMES = [
     "Scout", "Striker", "Falcon", "Viper", "Sunray", "Ranger", "Wraith",
-    "Spectre", "Mantis", "Barracuda", "Nova", "Comet", "Phantom", "Pulsar", "Eclipse"
+    "Spectre", "Mantis", "Barracuda", "Nova", "Comet", "Phantom", "Pulsar", "Eclipse",
+    "Azure", "Plasma", "Cinder", "Rose",
+    "Cobalt", "Rosegold", "Fusion"
   ];
 
   const ships = shipFiles.map((file, i) => ({
@@ -45,11 +49,11 @@ window.DATA = (function () {
   // are never rotated in-game.
   const BULLET_NAMES = [
     "Basic", "Laser", "Rockets", "Fang", "Wobble", "Slug", "Arrows",
-    "Photon", "Pulse", "Ultra Rockets"
+    "Photon", "Pulse", "Ultra Rockets", "Spikes", "Halo", "Meteor", "Shard"
   ];
 
   const bullets = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 14; i++) {
     bullets.push({
       id: "bullet-" + (i + 1),
       file: "costume" + (i + 1) + ".svg",
@@ -67,7 +71,9 @@ window.DATA = (function () {
     { file: "costume1.svg", name: "Ember" },
     { file: "costume3.svg", name: "Stardust" },
     { file: "costume4.svg", name: "BOOST" },
-    { file: "costume5.svg", name: "Aurora" }
+    { file: "costume5.svg", name: "Aurora" },
+    { file: "costume6.svg", name: "Frost" },
+    { file: "costume7.svg", name: "Phantom" }
   ];
   const trails = [];
   for (let i = 0; i < TRAILS.length; i++) {
@@ -141,6 +147,46 @@ window.DATA = (function () {
         { count: 30, size: [2, 3], speed: [90, 170], colors: ["#ff6ef0", "#6ea8ff"] }
       ],
       accent: "#ff6ec7"
+    },
+    {
+      id: "solarflare",
+      name: "Solar Flare",
+      skyTop: "#2a0a13", skyBottom: "#83210e",
+      stars: [
+        { count: 70, size: [1, 2], speed: [30, 90], colors: ["#ffd9a0", "#ffb066"] },
+        { count: 30, size: [2, 3], speed: [90, 170], colors: ["#ffe27a", "#ff8a4d"] }
+      ],
+      accent: "#ffb347"
+    },
+    {
+      id: "deepvoid",
+      name: "Deep Void",
+      skyTop: "#01030a", skyBottom: "#0a1130",
+      stars: [
+        { count: 70, size: [1, 2], speed: [30, 90], colors: ["#6ea8ff", "#9bc4ff"] },
+        { count: 30, size: [2, 3], speed: [90, 170], colors: ["#bcd6ff", "#ffffff"] }
+      ],
+      accent: "#7aa8ff"
+    },
+    {
+      id: "crimsonbelt",
+      name: "Crimson Belt",
+      skyTop: "#1a072e", skyBottom: "#5c0d17",
+      stars: [
+        { count: 70, size: [1, 2], speed: [30, 90], colors: ["#ff8a8a", "#ffb0b0"] },
+        { count: 30, size: [2, 3], speed: [90, 170], colors: ["#ff6a6a", "#ffd3d3"] }
+      ],
+      accent: "#ff6a6a"
+    },
+    {
+      id: "icefield",
+      name: "Ice Field",
+      skyTop: "#e8fbff", skyBottom: "#1b4d6b",
+      stars: [
+        { count: 70, size: [1, 2], speed: [30, 90], colors: ["#ffffff", "#dff6ff"] },
+        { count: 30, size: [2, 3], speed: [90, 170], colors: ["#ffffff", "#b7ecff"] }
+      ],
+      accent: "#7fb6e6"
     }
   ];
 

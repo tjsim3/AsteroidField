@@ -1,0 +1,11 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="40" height="100" viewBox="0 0 40 100">
+  <g fill-rule="nonzero" stroke="none">
+    <!-- Shard: twin crystalline darts - tip is triangular, and a lighter
+         lip triangle overlaps the trailing edge, reading as two layers -->
+    <polygon points="14,11 14,39 30,25" fill="#c8eaff"/>
+    <polygon points="12,14 12,36 27,25" fill="#8fd8ff"/>
+    <polygon points="14,61 14,89 30,75" fill="#c8eaff"/>
+    <polygon points="12,64 12,86 27,75" fill="#8fd8ff"/>
+    
+  </g>
+</svg>

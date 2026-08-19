@@ -1,0 +1,11 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="40" height="100" viewBox="0 0 40 100">
+  <g fill-rule="nonzero" stroke="none">
+    <!-- Halo: twin glowing rings wrapped around gold cores -->
+    <circle cx="20" cy="25" r="12" fill="none" stroke="#37e0ff" stroke-width="3"/>
+    <circle cx="32" cy="25" r="3" fill="#37e0ff"/>
+    <circle cx="20" cy="25" r="5" fill="#ffd34d"/>
+    <circle cx="20" cy="75" r="12" fill="none" stroke="#37e0ff" stroke-width="3"/>
+    <circle cx="32" cy="75" r="3" fill="#37e0ff"/>
+    <circle cx="20" cy="75" r="5" fill="#ffd34d"/>
+  </g>
+</svg>

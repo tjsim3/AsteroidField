@@ -1,0 +1,9 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="40" height="100" viewBox="0 0 40 100">
+  <g fill-rule="nonzero" stroke="none">
+    <!-- Spikes: twin jagged black-iron shards -->
+    <polygon points="12,13 32,25 12,37" fill="#0fbf8f"/>
+    <polygon points="17,16 32,25 17,34" fill="#d9ffef"/>
+    <polygon points="12,63 32,75 12,87" fill="#0fbf8f"/>
+    <polygon points="17,66 32,75 17,84" fill="#d9ffef"/>
+  </g>
+</svg>

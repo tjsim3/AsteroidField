@@ -1,0 +1,13 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="40" height="100" viewBox="0 0 40 100">
+  <g fill-rule="nonzero" stroke="none">
+    <!-- Meteor: twin ember cores dragging flame tails -->
+    <polygon points="12,17 2,25 12,33" fill="#ff8a4d"/>
+    <polygon points="15,20 6,25 15,30" fill="#ffd34d"/>
+    <circle cx="21" cy="25" r="8" fill="#ff5a1f"/>
+    <circle cx="23" cy="23" r="3" fill="#ffe08a"/>
+    <polygon points="12,67 2,75 12,83" fill="#ff8a4d"/>
+    <polygon points="15,70 6,75 15,80" fill="#ffd34d"/>
+    <circle cx="21" cy="75" r="8" fill="#ff5a1f"/>
+    <circle cx="23" cy="73" r="3" fill="#ffe08a"/>
+  </g>
+</svg>
