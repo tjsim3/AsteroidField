@@ -401,6 +401,11 @@ button:focus-visible {
   border-color: rgba(217, 122, 137, 0.4);
 }
 
+.hud-player-status.gun-on {
+  color: #7fe8ff;
+  border-color: rgba(127, 232, 255, 0.5);
+}
+
 .hearts { font-size: 20px; letter-spacing: 2px; }
 .hearts .on  { color: #d97a89; }
 .hearts .off { color: #5a638a; }

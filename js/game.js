@@ -210,6 +210,9 @@ window.Game = (function () {
         bullet: bullet,    // this player's shot skin
         name: name,        // short tag shown above the ship in 2P
         color: color,      // color of the tag + HUD label
+        gun: null,         // active gun powerup id (laser/shotgun/rockets/rapidfire/shock)
+        gunT: 0,           // seconds left on the current gun powerup
+        rapidCd: 0,        // auto-fire interval clock while rapid fire is active
         damageTaken: 0,    // how many times this player got hit (for the end screen)
         diedAt: null,      // runTime (seconds) when this player went down, null if alive
         bulletsFired: 0    // for the end screen
@@ -413,7 +416,18 @@ window.Game = (function () {
       }
 
       // ---- shooting ----
-      if (shoot && p.ammo > 0 && p.fireCd <= 0) {
+      // Gun powerups override the normal shots. Rapid fire is the odd one
+      // out: it auto-fires for free and locks out your own ammo for a while.
+      if (p.gunT > 0) p.gunT = Math.max(0, p.gunT - dt);
+      if (p.gunT <= 0 && p.gun) { p.gun = null; }
+
+      if (p.gun === "rapidfire") {
+        p.rapidCd -= dt;
+        if (p.rapidCd <= 0) {
+          p.rapidCd = 0.09;
+          fireGun(p);
+        }
+      } else if (shoot && p.ammo > 0 && p.fireCd <= 0) {
         fire(p);
       }
     }
@@ -454,8 +468,9 @@ window.Game = (function () {
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
       b.x += b.vx * dt;
+      if (b.vy) b.y += b.vy * dt;
       b.comboPop = Math.max(0, b.comboPop - dt);
-      if (b.x > W + 40) {
+      if (b.x > W + 40 || b.y < -80 || b.y > H + 80) {
         // keep its combo badge on screen for a slow 3-second fade-out;
         // clamp x inside the edge so the label is actually visible
         if (b.combo >= 2) {
@@ -562,7 +577,25 @@ window.Game = (function () {
     for (let ai = 0; ai < asteroids.length; ai++) {
       const a = asteroids[ai];
       if (circleHit(b.x, b.y, b.r, a.x, a.y, a.r)) {
-        // bullets punch straight through every rock until they leave the screen
+        // rockets and shock bolts detonate on the first rock they touch
+        if (b.gun === "rockets") {
+          b.combo = rocketBlast(b.x, b.y);
+          b.comboPop = 0.15;
+          if (b.combo > runStats.maxCombo) runStats.maxCombo = b.combo;
+          addComboTotal(b.combo);
+          bullets.splice(bi, 1);
+          return;
+        }
+        if (b.gun === "shock") {
+          b.combo = shockChain(b.x, b.y);
+          b.comboPop = 0.15;
+          if (b.combo > runStats.maxCombo) runStats.maxCombo = b.combo;
+          addComboTotal(b.combo);
+          bullets.splice(bi, 1);
+          return;
+        }
+        // bullets (and laser / shotgun pellets) punch straight through
+        // every rock until they leave the screen
         b.combo++;
         b.comboPop = 0.15;   // pop the combo label on the next frame
         if (b.combo > runStats.maxCombo) runStats.maxCombo = b.combo;
@@ -572,6 +605,44 @@ window.Game = (function () {
         return;
       }
     }
+  }
+
+  /* Rocket: a big firey blast that takes out every asteroid in a 100px
+     radius around the impact. Returns how many rocks it killed. */
+  const ROCKET_RANGE = 100;
+  function rocketBlast(x, y) {
+    const targets = asteroids.filter(function (a) {
+      return circleHit(x, y, ROCKET_RANGE, a.x, a.y, a.r);
+    });
+    targets.forEach(function (a) { destroyAsteroid(a, false); });
+    FX.rocketExplode(x, y);
+    SFX.bigBoom();
+    return targets.length;
+  }
+
+  /* Shock: chain lightning - the bolt eats a rock, then jumps to any rock
+     within range of it, and so on. Returns how many rocks it zapped. */
+  const SHOCK_RANGE = 140;
+  function shockChain(x, y) {
+    const rangeOf = function (ax, ay) {
+      return function (o) {
+        return circleHit(ax, ay, SHOCK_RANGE, o.x, o.y, o.r);
+      };
+    };
+    let pending = asteroids.filter(rangeOf(x, y));
+    const hit = [];
+    while (pending.length) {
+      const a = pending.pop();
+      if (hit.indexOf(a) > -1) continue;
+      hit.push(a);
+      asteroids.forEach(function (o) {
+        if (hit.indexOf(o) < 0 && rangeOf(a.x, a.y)(o)) pending.push(o);
+      });
+      if (hit.length > 1) FX.lightning(a.x, a.y, hit[hit.length - 2].x, hit[hit.length - 2].y);
+    }
+    hit.forEach(function (a) { destroyAsteroid(a, false); });
+    if (hit.length) SFX.zap();
+    return hit.length;
   }
 
   /* Each finished combo (a bullet that punched through rocks) adds its size
@@ -615,7 +686,22 @@ window.Game = (function () {
     p.fireCd = G.fireCooldown;
     p.bulletsFired++;
     runStats.bulletsFired++;
+    if (p.gun === "laser") fireLaser(p);
+    else if (p.gun === "shotgun") fireShotgun(p);
+    else if (p.gun === "rockets") fireRocket(p);
+    else if (p.gun === "shock") fireShock(p);
+    else fireBullet(p);
+  }
 
+  /* Rapid fire has no trigger and never touches your ammo - it just spams
+     normal bullets on its own clock. */
+  function fireGun(p) {
+    p.bulletsFired++;
+    runStats.bulletsFired++;
+    fireBullet(p);
+  }
+
+  function fireBullet(p) {
     // Each skin is already drawn as a pair of bullets, so one shot is enough.
     bullets.push({
       x: p.x + 26,
@@ -626,7 +712,136 @@ window.Game = (function () {
       bid: ++bulletId,
       combo: 0,        // how many asteroids THIS bullet has punched through
       comboPop: 0,     // seconds since the last combo bump (drives the pop)
+      gun: null,       // normal shot
       skin: p.bullet   // this player's chosen shot skin
+    });
+    FX.muzzleFlash(p.x + 24, p.y);
+    SFX.shoot();
+  }
+
+  /* Laser: one fat energy bar instead of bullets. Same punch-through and
+     combo rules as a bullet, so everything transfers cleanly. */
+  function fireLaser(p) {
+    bullets.push({
+      x: p.x + 30,
+      y: p.y,
+      vx: 1050,
+      r: 28,
+      hits: 0,
+      bid: ++bulletId,
+      combo: 0,
+      comboPop: 0,
+      gun: "laser",
+      skin: p.bullet
+    });
+    FX.muzzleFlash(p.x + 24, p.y);
+    SFX.shoot();
+  }
+
+  /* Shotgun: five pellets, 30/15/0/-15/-30 degrees. Each pellet acts like
+     a normal falling bullet (combo and all). */
+  function fireShotgun(p) {
+    bullets.push({
+      x: p.x + 26,
+      y: p.y,
+      vx: 1050 * Math.cos((-30 * Math.PI) / 180),
+      vy: 1050 * Math.sin((-30 * Math.PI) / 180),
+      r: 11,
+      hits: 0,
+      bid: ++bulletId,
+      combo: 0,
+      comboPop: 0,
+      gun: "shotgun",
+      skin: p.bullet
+    });
+    bullets.push({
+      x: p.x + 26,
+      y: p.y,
+      vx: 1050 * Math.cos((-15 * Math.PI) / 180),
+      vy: 1050 * Math.sin((-15 * Math.PI) / 180),
+      r: 11,
+      hits: 0,
+      bid: ++bulletId,
+      combo: 0,
+      comboPop: 0,
+      gun: "shotgun",
+      skin: p.bullet
+    });
+    bullets.push({
+      x: p.x + 26,
+      y: p.y,
+      vx: 1050,
+      vy: 0,
+      r: 11,
+      hits: 0,
+      bid: ++bulletId,
+      combo: 0,
+      comboPop: 0,
+      gun: "shotgun",
+      skin: p.bullet
+    });
+    bullets.push({
+      x: p.x + 26,
+      y: p.y,
+      vx: 1050 * Math.cos((15 * Math.PI) / 180),
+      vy: 1050 * Math.sin((15 * Math.PI) / 180),
+      r: 11,
+      hits: 0,
+      bid: ++bulletId,
+      combo: 0,
+      comboPop: 0,
+      gun: "shotgun",
+      skin: p.bullet
+    });
+    bullets.push({
+      x: p.x + 26,
+      y: p.y,
+      vx: 1050 * Math.cos((30 * Math.PI) / 180),
+      vy: 1050 * Math.sin((30 * Math.PI) / 180),
+      r: 11,
+      hits: 0,
+      bid: ++bulletId,
+      combo: 0,
+      comboPop: 0,
+      gun: "shotgun",
+      skin: p.bullet
+    });
+    FX.muzzleFlash(p.x + 24, p.y);
+    SFX.shoot();
+  }
+
+  /* Rockets: one rocket per trigger pull; it blows up on the first rock it
+     touches, torching every asteroid within 100px. */
+  function fireRocket(p) {
+    bullets.push({
+      x: p.x + 30,
+      y: p.y,
+      vx: 950,
+      r: 24,
+      hits: 0,
+      bid: ++bulletId,
+      combo: 0,
+      comboPop: 0,
+      gun: "rockets",
+      skin: p.bullet
+    });
+    FX.muzzleFlash(p.x + 24, p.y);
+    SFX.shoot();
+  }
+
+  /* Shock: a bolt that jumps from asteroid to asteroid within range. */
+  function fireShock(p) {
+    bullets.push({
+      x: p.x + 30,
+      y: p.y,
+      vx: 1050,
+      r: 26,
+      hits: 0,
+      bid: ++bulletId,
+      combo: 0,
+      comboPop: 0,
+      gun: "shock",
+      skin: p.bullet
     });
     FX.muzzleFlash(p.x + 24, p.y);
     SFX.shoot();
@@ -769,7 +984,17 @@ window.Game = (function () {
     slow: { color: "#b06bff", msg: "Slow-Mo!" },
     shrink: { color: "#ffe93a", msg: "Shrunk!" },
     clear: { color: "#ff9300", msg: "SCREEN CLEAR!" },
-    health: { color: "#ff5c6c", msg: "+1 Life" }
+    health: { color: "#ff5c6c", msg: "+1 Life" },
+    laser: { color: "#6ff0ff", msg: "LASER!" },
+    shotgun: { color: "#ffa94d", msg: "SHOTGUN!" },
+    rockets: { color: "#ff7b4d", msg: "ROCKETS!" },
+    rapidfire: { color: "#ffe93a", msg: "RAPID FIRE!" },
+    shock: { color: "#9ee6ff", msg: "SHOCK!" }
+  };
+
+  const GUN_LABELS = {
+    laser: "LASER", shotgun: "SHOTGUN", rockets: "ROCKETS",
+    rapidfire: "RAPID FIRE", shock: "SHOCK"
   };
 
   /* Timer-driven health drop: flies across the screen every 30s (then 31s,
@@ -873,6 +1098,15 @@ window.Game = (function () {
       FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 22);
       FX.addShake(10);
       SFX.bigBoom();
+    } else if (pwr.id === "laser" || pwr.id === "shotgun" || pwr.id === "rockets" ||
+               pwr.id === "rapidfire" || pwr.id === "shock") {
+      // gun powerup: swap this player's shots for a while
+      const def = DATA.powerups.find(function (d) { return d.id === pwr.id; });
+      pl.gun = pwr.id;
+      pl.gunT = def ? def.dur : 30;
+      pl.rapidCd = 0;
+      FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 18);
+      SFX.power();
     }
 
     // lifetime collection stat
@@ -1016,15 +1250,21 @@ window.Game = (function () {
     // ---- power-ups ----
     for (const p of powerups) {
       if (p.id === "health") {
-        // pulsing halo + bigger sprite so the health drop stands out
+        // floating spotlight with the battery centered inside it - the
+        // battery is what you actually fly into to grab a life
         const pulse = 0.5 + 0.5 * Math.sin(p.t * 5);
-        ctx.globalAlpha = 0.3 + 0.25 * pulse;
+        ctx.globalAlpha = 0.28 + 0.22 * pulse;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 30 + 9 * pulse, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, 31 + 9 * pulse, 0, Math.PI * 2);
         ctx.fillStyle = "#ff5c6c";
         ctx.fill();
         ctx.globalAlpha = 1;
-        drawSprite(p.icon, p.x, p.y, 42, 42, 0);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 31, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        drawSprite(p.icon, p.x, p.y, 46, 46, 0);
       } else {
         drawSprite(p.icon, p.x, p.y, 34, 34, 0);
       }
@@ -1039,15 +1279,7 @@ window.Game = (function () {
 
     // ---- bullets ----
     for (const b of bullets) {
-      // Each bullet remembers which player fired it, so the skins can differ.
-      const bDef = DATA.bullets.find(function (x) { return x.id === b.skin; }) || DATA.bullets[0];
-      const bulletImg = ASSETS.get(bDef ? bDef.src : "");
-      const bNatW = bulletImg ? bulletImg.width || 30 : 30;
-      const bNatH = bulletImg ? bulletImg.height || 30 : 30;
-      // Each skin says which rotation makes it point right (see data.js).
-      const bRot = bDef ? bDef.rot : -90;
-      const bs = 44 / Math.max(bNatW, bNatH);
-      drawImg(bulletImg, b.x, b.y, bNatW * bs, bNatH * bs, bRot);
+      drawGunProjectile(b);
 
       // per-bullet combo badge: floats above the bullet, pops on each hit
       if (b.combo >= 2) {
@@ -1174,6 +1406,67 @@ window.Game = (function () {
     return found ? found.src : "";
   }
 
+  /* Draw one shot. Normal bullets use the player's bullet skin; each gun
+     powerup has its own look. */
+  function drawGunProjectile(b) {
+    if (b.gun === "laser") {
+      // a long energy bar streaking across the screen
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = "#4deaff";
+      ctx.fillRect(b.x - 68, b.y - 14, 136, 28);
+      ctx.globalAlpha = 0.65;
+      ctx.fillStyle = "#9bf4ff";
+      ctx.fillRect(b.x - 62, b.y - 9, 124, 18);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(b.x - 56, b.y - 5, 112, 10);
+      ctx.restore();
+      return;
+    }
+    if (b.gun === "shotgun") {
+      // hot pellet
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 8, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,169,77,0.4)";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffa94d";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff3d6";
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+    if (b.gun === "rockets") {
+      drawSprite("AsteroidsAndPowerups/RocketBullet.svg", b.x, b.y, 40, 22, 0);
+      // exhaust glow behind the nose
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = "#ffb347";
+      ctx.fillRect(b.x - 52, b.y - 4, 22, 8);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+      return;
+    }
+    if (b.gun === "shock") {
+      drawSprite("AsteroidsAndPowerups/ShockBullet.svg", b.x, b.y, 34, 34, 0);
+      return;
+    }
+    // normal bullet / rapid fire: the player's chosen skin
+    const bDef = DATA.bullets.find(function (x) { return x.id === b.skin; }) || DATA.bullets[0];
+    const bulletImg = ASSETS.get(bDef ? bDef.src : "");
+    const bNatW = bulletImg ? bulletImg.width || 30 : 30;
+    const bNatH = bulletImg ? bulletImg.height || 30 : 30;
+    const bRot = bDef ? bDef.rot : -90;
+    const bs = 44 / Math.max(bNatW, bNatH);
+    drawImg(bulletImg, b.x, b.y, bNatW * bs, bNatH * bs, bRot);
+  }
+
   function drawSprite(src, x, y, w, h, rotDeg) {
     const img = ASSETS.get(src);
     if (!img) return;
@@ -1243,11 +1536,13 @@ window.Game = (function () {
       if (!chip) return;
       const bits = [];
       if (p.health <= 0) bits.push("OUT");
+      if (p.gun) bits.push(GUN_LABELS[p.gun] + " " + Math.ceil(p.gunT) + "s");
       if (p.invulnT > 0) bits.push("INVULNERABLE");
       if (shrinkT > 0) bits.push("SHRUNK " + shrinkT.toFixed(1) + "s");
       if (slowT > 0) bits.push("SLOW " + slowT.toFixed(1) + "s");
       chip.textContent = bits.join("  |  ");
       chip.classList.toggle("out", p.health <= 0);
+      chip.classList.toggle("gun-on", !!p.gun);
     });
 
     // score: one digit image per character

@@ -117,6 +117,11 @@ window.SFX = (function () {
     tone(320, 0.4, "sine", 0.15, 80);
   }
 
+  function zap() {
+    tone(1500, 0.08, "sawtooth", 0.1, 300);
+    tone(2400, 0.12, "square", 0.08, 600, 0.03);
+  }
+
   function bigBoom() {
     noise(0.6, 0.45, 500);
     tone(90, 0.6, "triangle", 0.24, 28);
@@ -140,6 +145,6 @@ window.SFX = (function () {
 
   return {
     unlock, setVolume, shoot, boom, hurt, coin, power, heal,
-    slowMo, bigBoom, over, click, unlockFx
+    slowMo, zap, bigBoom, over, click, unlockFx
   };
 })();

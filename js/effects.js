@@ -7,6 +7,7 @@ window.FX = (function () {
 
   const particles = [];   // {x,y,vx,vy,life,maxLife,size,color}
   const texts = [];       // floating text: {x,y,vy,life,text,color,size}
+  const bolts = [];       // shock-chain lightning: {pts, life, maxLife}
   let shake = 0;          // remaining screen-shake strength
   let shakeEnabled = true;
   let fxEnabled = true;
@@ -76,6 +77,32 @@ window.FX = (function () {
     burst(x, y, 14, ["#39ff5a", "#c9ffe9", "#ffffff"], 30, 150, 2, 5);
   }
 
+  /* Big firey blast for a rocket impact. */
+  function rocketExplode(x, y) {
+    if (!fxEnabled) return;
+    burst(x, y, 56, ["#ff9300", "#ff4d4d", "#ffe93a", "#ffd700", "#ffffff"], 50, 430, 4, 11);
+    burst(x, y, 26, ["#ffffff", "#ffd28a"], 20, 200, 2, 7);
+    addShake(13);
+  }
+
+  /* Jagged chain-lightning bolt between two points. */
+  function lightning(x1, y1, x2, y2) {
+    const pts = [{ x: x1, y: y1 }];
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.max(1, Math.hypot(dx, dy));
+    const nx = -dy / len, ny = dx / len;
+    const seg = 6;
+    for (let i = 1; i < seg; i++) {
+      const t = i / seg;
+      pts.push({
+        x: x1 + dx * t + nx * (Math.random() - 0.5) * 16,
+        y: y1 + dy * t + ny * (Math.random() - 0.5) * 16
+      });
+    }
+    pts.push({ x: x2, y: y2 });
+    bolts.push({ pts, life: 0.3, maxLife: 0.3 });
+  }
+
   function pickupFx(x, y, color) {
     burst(x, y, 12, [color, "#ffffff"], 30, 160, 2, 5);
   }
@@ -117,6 +144,10 @@ window.FX = (function () {
       t.life -= dt;
       if (t.life <= 0) texts.splice(i, 1);
     }
+    for (let i = bolts.length - 1; i >= 0; i--) {
+      bolts[i].life -= dt;
+      if (bolts[i].life <= 0) bolts.splice(i, 1);
+    }
     if (shake > 0) shake = Math.max(0, shake - 40 * dt);
   }
 
@@ -144,16 +175,38 @@ window.FX = (function () {
       ctx.fillText(t.text, t.x, t.y);
     }
     ctx.globalAlpha = 1;
+
+    // chain-lightning bolts
+    for (const bl of bolts) {
+      const a = Math.max(0, bl.life / bl.maxLife);
+      ctx.globalAlpha = a;
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#6ff0ff";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(bl.pts[0].x, bl.pts[0].y);
+      for (let i = 1; i < bl.pts.length; i++) ctx.lineTo(bl.pts[i].x, bl.pts[i].y);
+      ctx.stroke();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(bl.pts[0].x, bl.pts[0].y);
+      for (let i = 1; i < bl.pts.length; i++) ctx.lineTo(bl.pts[i].x, bl.pts[i].y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
   }
 
   function clear() {
     particles.length = 0;
     texts.length = 0;
+    bolts.length = 0;
     shake = 0;
   }
 
   return {
     burst, explosion, healFx, pickupFx, muzzleFlash, floatText,
+    lightning, rocketExplode,
     update, draw, clear, addShake, getShake, setShake, setFx
   };
 })();

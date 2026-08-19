@@ -143,7 +143,13 @@ window.DATA = (function () {
     { id: "reload", name: "Bullet Drop", desc: "The green circle gives you +3 bullets when collected.", icon: "AsteroidsAndPowerups/Reload.svg", weight: 3 },
     { id: "slow", name: "Slow Drop", desc: "Slow-motion! All asteroids move at half speed for 6 seconds.", icon: "AsteroidsAndPowerups/SlowDown.svg", weight: 1 },
     { id: "shrink", name: "Shrink Drop", desc: "Shrink your ship so you are harder to hit, for 6 seconds.", icon: "AsteroidsAndPowerups/Shrink.svg", weight: 1 },
-    { id: "clear", name: "Screen Clear", desc: "A mighty blast destroys every asteroid on screen. Ka-boom!", icon: "AsteroidsAndPowerups/ClearScreen2.svg", weight: 1 }
+    { id: "clear", name: "Screen Clear", desc: "A mighty blast destroys every asteroid on screen. Ka-boom!", icon: "AsteroidsAndPowerups/ClearScreen2.svg", weight: 1 },
+    // gun powerups - they override your shots for a while (dur = seconds)
+    { id: "laser", name: "Laser", desc: "Your shots become a blazing energy beam for 30 seconds.", icon: "AsteroidsAndPowerups/Laser.svg", weight: 1, dur: 30 },
+    { id: "shotgun", name: "Shotgun", desc: "Blast 5 pellets in a spread for 30 seconds.", icon: "AsteroidsAndPowerups/Shotgun.svg", weight: 1, dur: 30 },
+    { id: "rockets", name: "Rockets", desc: "Fire rockets that explode in a firey blast on impact, for 30 seconds.", icon: "AsteroidsAndPowerups/Rockets.svg", weight: 1, dur: 30 },
+    { id: "rapidfire", name: "Rapid Fire", desc: "Auto-fire for 10 seconds without using any bullets.", icon: "AsteroidsAndPowerups/RapidFire.svg", weight: 1, dur: 10 },
+    { id: "shock", name: "Shock", desc: "Chain lightning that leaps between nearby asteroids, for 30 seconds.", icon: "AsteroidsAndPowerups/Shock.svg", weight: 1, dur: 30 }
   ];
 
   /* ---------- Achievements (the images ARE the achievement buttons) ---------- */
@@ -220,6 +226,7 @@ window.DATA = (function () {
     "Use your second of recovery to get out of the way.",
     "Grab every dollar bill you can - it banks to real cash.",
     "Power-ups usually show up in groups - look for a second.",
+    "Gun drops (laser, shotgun, rockets, rapid fire, shock) change your shots for a while - grab one before it drifts past.",
     "You can squeeze through small gaps if you keep moving."
   ];
 
