@@ -8,6 +8,7 @@ window.FX = (function () {
   const particles = [];   // {x,y,vx,vy,life,maxLife,size,color}
   const texts = [];       // floating text: {x,y,vy,life,text,color,size}
   const bolts = [];       // shock-chain lightning: {pts, life, maxLife}
+  const rings = [];       // expanding blast-radius rings: {x,y,r,r0,life,maxLife,color}
   let shake = 0;          // remaining screen-shake strength
   let shakeEnabled = true;
   let fxEnabled = true;
@@ -80,9 +81,19 @@ window.FX = (function () {
   /* Big firey blast for a rocket impact. */
   function rocketExplode(x, y) {
     if (!fxEnabled) return;
-    burst(x, y, 56, ["#ff9300", "#ff4d4d", "#ffe93a", "#ffd700", "#ffffff"], 50, 430, 4, 11);
-    burst(x, y, 26, ["#ffffff", "#ffd28a"], 20, 200, 2, 7);
-    addShake(13);
+    burst(x, y, 95, ["#ff9300", "#ff4d4d", "#ffe93a", "#ffd700", "#ffffff"], 60, 480, 5, 13);
+    burst(x, y, 45, ["#ffffff", "#ffd28a"], 25, 260, 3, 8);
+    ring(x, y, 240, 55, 0.35, "#ffb347", "#ff4d4d");
+    addShake(22);
+  }
+
+  /* An expanding circle that flashes a blast radius onto the screen. */
+  function ring(x, y, maxR, fromR, life, color, fillColor) {
+    rings.push({ x: x, y: y, r: maxR, r0: fromR != null ? fromR : 0, life: life || 0.5, maxLife: life || 0.5, color: color || "#ff7b4d", fillColor: fillColor || null });
+  }
+
+  function radiusRing(x, y, r, color) {
+    ring(x, y, r, r * 0.3, 0.55, color, color);
   }
 
   /* Jagged chain-lightning bolt between two points. */
@@ -148,6 +159,10 @@ window.FX = (function () {
       bolts[i].life -= dt;
       if (bolts[i].life <= 0) bolts.splice(i, 1);
     }
+    for (let i = rings.length - 1; i >= 0; i--) {
+      rings[i].life -= dt;
+      if (rings[i].life <= 0) rings.splice(i, 1);
+    }
     if (shake > 0) shake = Math.max(0, shake - 40 * dt);
   }
 
@@ -189,10 +204,29 @@ window.FX = (function () {
       ctx.stroke();
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(bl.pts[0].x, bl.pts[0].y);
-      for (let i = 1; i < bl.pts.length; i++) ctx.lineTo(bl.pts[i].x, bl.pts[i].y);
       ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // expanding blast-radius rings (rockets, etc.) - light up the blast
+    for (const rg of rings) {
+      const k = 1 - rg.life / rg.maxLife;            // 0 -> 1
+      const rad = rg.r0 + (rg.r - rg.r0) * k;
+      const a = Math.max(0, rg.life / rg.maxLife);   // 1 -> 0
+      ctx.globalAlpha = a * 0.9;
+      ctx.strokeStyle = rg.color;
+      ctx.lineWidth = 1 + 5 * (1 - k);
+      ctx.shadowColor = rg.color;
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.arc(rg.x, rg.y, rad, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = a * 0.18;
+      ctx.fillStyle = rg.fillColor;
+      ctx.beginPath();
+      ctx.arc(rg.x, rg.y, rad, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
     }
     ctx.globalAlpha = 1;
   }
@@ -201,12 +235,13 @@ window.FX = (function () {
     particles.length = 0;
     texts.length = 0;
     bolts.length = 0;
+    rings.length = 0;
     shake = 0;
   }
 
   return {
     burst, explosion, healFx, pickupFx, muzzleFlash, floatText,
-    lightning, rocketExplode,
+    lightning, rocketExplode, ring, radiusRing,
     update, draw, clear, addShake, getShake, setShake, setFx
   };
 })();

@@ -215,6 +215,9 @@ window.Game = (function () {
         gun: null,         // active gun powerup id (laser/shotgun/rockets/rapidfire/shock)
         gunT: 0,           // seconds left on the current gun powerup
         rapidCd: 0,        // auto-fire interval clock while rapid fire is active
+        energy: 100,       // laser-only battery; drains while the beam is held
+        laserOn: false,    // whether the laser beam is firing right now
+        beamKills: 0,      // rocks this laser streak has destroyed (reset on release)
         damageTaken: 0,    // how many times this player got hit (for the end screen)
         diedAt: null,      // runTime (seconds) when this player went down, null if alive
         bulletsFired: 0    // for the end screen
@@ -425,7 +428,31 @@ window.Game = (function () {
       if (p.gunT > 0) p.gunT = Math.max(0, p.gunT - dt);
       if (p.gunT <= 0 && p.gun) { p.gun = null; }
 
-      if (p.gun === "rapidfire") {
+      if (p.gun === "laser") {
+        // Sustained beam: no bullets, no ammo - a full-width line that
+        // incinerates everything in range while the trigger is held. The
+        // battery drains for as long as the beam is on; at zero it's spent.
+        const firing = shoot && p.gunT > 0 && p.energy > 0;
+        if (firing) {
+          p.energy = Math.max(0, p.energy - 12 * dt);
+          if (!p.laserOn) p.laserOn = true;
+          beamSweep(p);
+        }
+        if (!firing && p.laserOn) {
+          finishLaserBeam(p);
+          p.laserOn = false;
+        }
+        if (p.energy <= 0) {
+          finishLaserBeam(p);
+          p.laserOn = false;
+          p.gun = null;
+          p.gunT = 0;
+        }
+      } else if (p.laserOn) {
+        // gun swapped or expired mid-beam
+        finishLaserBeam(p);
+        p.laserOn = false;
+      } else if (p.gun === "rapidfire") {
         p.rapidCd -= dt;
         if (p.rapidCd <= 0) {
           p.rapidCd = 0.09;
@@ -619,17 +646,24 @@ window.Game = (function () {
     }
   }
 
-  /* Rocket: a big firey blast that takes out every asteroid in a 100px
-     radius around the impact. Returns how many rocks it killed. */
-  const ROCKET_RANGE = 100;
+  /* Rocket: a big firey blast in a 300px radius around the impact. It keeps
+     re-sweeping so freshly-split child asteroids inside the blast all burn
+     too. Returns how many rocks it torched. */
+  const ROCKET_RANGE = 300;
   function rocketBlast(x, y) {
-    const targets = asteroids.filter(function (a) {
-      return circleHit(x, y, ROCKET_RANGE, a.x, a.y, a.r);
-    });
-    targets.forEach(function (a) { destroyAsteroid(a, false); });
+    let killed = 0;
+    for (let pass = 0; pass < 5; pass++) {
+      const targets = asteroids.filter(function (a) {
+        return circleHit(x, y, ROCKET_RANGE, a.x, a.y, a.r);
+      });
+      if (!targets.length) break;
+      targets.forEach(function (a) { destroyAsteroid(a, false); });
+      killed += targets.length;
+    }
     FX.rocketExplode(x, y);
+    FX.radiusRing(x, y, ROCKET_RANGE, "#ff7b4d");
     SFX.bigBoom();
-    return targets.length;
+    return killed;
   }
 
   /* Shock: chain lightning - the bolt eats a rock, then jumps to any rock
@@ -731,24 +765,11 @@ window.Game = (function () {
     SFX.shoot();
   }
 
-  /* Laser: one fat energy bar instead of bullets. Same punch-through and
-     combo rules as a bullet, so everything transfers cleanly. */
-  function fireLaser(p) {
-    bullets.push({
-      x: p.x + 30,
-      y: p.y,
-      vx: 1050,
-      r: 28,
-      hits: 0,
-      bid: ++bulletId,
-      combo: 0,
-      comboPop: 0,
-      gun: "laser",
-      skin: p.bullet
-    });
-    FX.muzzleFlash(p.x + 24, p.y);
-    SFX.shoot();
-  }
+  /* Laser does NOT fire bullets - the sustained beam (handled in the player
+     update) replaces shots entirely, so there's no projectile for it. */
+  function fireLaser(p) { fireBullet(p); }
+
+  /* Shotgun: five pellets, 30/15/0/-15/-30 degrees. Each pellet acts like
 
   /* Shotgun: five pellets, 30/15/0/-15/-30 degrees. Each pellet acts like
      a normal falling bullet (combo and all). */
@@ -857,6 +878,36 @@ window.Game = (function () {
     });
     FX.muzzleFlash(p.x + 24, p.y);
     SFX.shoot();
+  }
+
+  /* The laser's kill zone: a horizontal band that runs from the ship's nose
+     to the far edge of the screen. Anything overlapping it while the beam is
+     held is destroyed - but only IN FRONT of the player, never behind them. */
+  function beamSweep(p) {
+    const band = 22;
+    const x1 = p.x + 22;   // where the beam leaves the nose
+    for (let i = asteroids.length - 1; i >= 0; i--) {
+      const a = asteroids[i];
+      if (Math.abs(a.y - p.y) <= band + a.r &&
+          a.x + a.r >= x1 && a.x <= W) {
+        p.beamKills++;
+        destroyAsteroid(a, false);
+      }
+    }
+  }
+
+  /* When the beam stops (released, expired, or the gun is swapped), cash in
+     the streak as a combo. */
+  function finishLaserBeam(p) {
+    const k = p.beamKills || 0;
+    p.beamKills = 0;
+    if (k >= 2) {
+      runStats.comboKills += k;
+      if (k > runStats.maxCombo) runStats.maxCombo = k;
+      UI.unlock("long_" + k);
+      addComboTotal(k);
+      comboGhosts.push({ x: p.x + 160, y: p.y - 20, combo: k, t: 3, bid: ++bulletId });
+    }
   }
 
   // =====================================================
@@ -1052,6 +1103,9 @@ window.Game = (function () {
     pl.gun = id;
     pl.gunT = def ? def.dur : 30;
     pl.rapidCd = 0;
+    pl.energy = 100;
+    pl.laserOn = false;
+    pl.beamKills = 0;
     pl.ammo = Math.min(G.maxAmmo, pl.ammo + 5);
     const f = PFX[id] || { color: "#ffffff", msg: "" };
     FX.pickupFx(pl.x, pl.y, f.color);
@@ -1456,6 +1510,11 @@ window.Game = (function () {
         }
       }
 
+      // laser: the sustained beam that spans the whole screen while firing
+      if (!dead && p.gun === "laser" && p.laserOn) {
+        drawLaserBeam(p);
+      }
+
       // name tag above the ship (both players in 2P, none in solo)
       if (players.length > 1) {
         ctx.save();
@@ -1495,21 +1554,6 @@ window.Game = (function () {
   /* Draw one shot. Normal bullets use the player's bullet skin; each gun
      powerup has its own look. */
   function drawGunProjectile(b) {
-    if (b.gun === "laser") {
-      // a long energy bar streaking across the screen
-      ctx.save();
-      ctx.globalAlpha = 0.35;
-      ctx.fillStyle = "#4deaff";
-      ctx.fillRect(b.x - 68, b.y - 14, 136, 28);
-      ctx.globalAlpha = 0.65;
-      ctx.fillStyle = "#9bf4ff";
-      ctx.fillRect(b.x - 62, b.y - 9, 124, 18);
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(b.x - 56, b.y - 5, 112, 10);
-      ctx.restore();
-      return;
-    }
     if (b.gun === "shotgun") {
       // hot pellet
       ctx.save();
@@ -1529,18 +1573,18 @@ window.Game = (function () {
       return;
     }
     if (b.gun === "rockets") {
-      drawSprite("AsteroidsAndPowerups/RocketBullet.svg", b.x, b.y, 40, 22, 0);
+      drawSprite("AsteroidsAndPowerups/RocketBullet.svg", b.x, b.y, 80, 44, 0);
       // exhaust glow behind the nose
       ctx.save();
       ctx.globalAlpha = 0.5;
       ctx.fillStyle = "#ffb347";
-      ctx.fillRect(b.x - 52, b.y - 4, 22, 8);
+      ctx.fillRect(b.x - 90, b.y - 8, 30, 16);
       ctx.globalAlpha = 1;
       ctx.restore();
       return;
     }
     if (b.gun === "shock") {
-      drawSprite("AsteroidsAndPowerups/ShockBullet.svg", b.x, b.y, 34, 34, 0);
+      drawSprite("AsteroidsAndPowerups/ShockBullet.svg", b.x, b.y, 34, 34, 90);
       return;
     }
     // normal bullet / rapid fire: the player's chosen skin
@@ -1551,6 +1595,37 @@ window.Game = (function () {
     const bRot = bDef ? bDef.rot : -90;
     const bs = 44 / Math.max(bNatW, bNatH);
     drawImg(bulletImg, b.x, b.y, bNatW * bs, bNatH * bs, bRot);
+  }
+
+  /* Modern clean laser beam: a white-hot core wrapped in cyan glow,
+     spanning from the ship's nose to the far edge of the screen. */
+  function drawLaserBeam(p) {
+    const x1 = p.x + 22;
+    const y = p.y;
+    const gradMid = ctx.createLinearGradient(x1, 0, W, 0);
+    gradMid.addColorStop(0, "rgba(80,225,255,0.95)");
+    gradMid.addColorStop(0.6, "rgba(130,240,255,0.85)");
+    gradMid.addColorStop(1, "rgba(180,250,255,0.95)");
+    ctx.save();
+    ctx.shadowColor = "#37e0ff";
+    ctx.shadowBlur = 24;
+    // wide soft halo
+    ctx.globalAlpha = 0.32;
+    ctx.fillStyle = "#1fd0ff";
+    ctx.fillRect(x1, y - 26, Math.max(0, W - x1), 52);
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = "#4deaff";
+    ctx.fillRect(x1, y - 16, Math.max(0, W - x1), 32);
+    // body gradient
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = gradMid;
+    ctx.fillRect(x1, y - 9, Math.max(0, W - x1), 18);
+    // white-hot core
+    ctx.shadowBlur = 14;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x1, y - 3, Math.max(0, W - x1), 6);
+    ctx.restore();
   }
 
   function drawSprite(src, x, y, w, h, rotDeg) {
@@ -1609,7 +1684,8 @@ window.Game = (function () {
           '</div>' +
           '<div class="hud-row">' +
             '<span class="hud-name hud-name-blank"></span>' +
-            '<span class="ammo">' + ammo + '</span>' +
+            '<span class="ammo" id="hud-ammo-' + pi + '">' + ammo + '</span>' +
+            '<div class="hud-laser-energy" id="hud-laser-energy-' + pi + '"><i class="fill"></i></div>' +
           '</div>' +
           '<div class="hud-player-status" id="hud-player-status-' + pi + '"></div>';
       });
@@ -1629,6 +1705,20 @@ window.Game = (function () {
       chip.textContent = bits.join("  |  ");
       chip.classList.toggle("out", p.health <= 0);
       chip.classList.toggle("gun-on", !!p.gun);
+
+      // laser swaps the bullet counter for an energy bar
+      const ebar = document.getElementById("hud-laser-energy-" + pi);
+      const ammoEl = document.getElementById("hud-ammo-" + pi);
+      const isLaser = !!p.gun && p.gun === "laser";
+      if (ebar) {
+        ebar.classList.toggle("on", isLaser);
+        if (isLaser) {
+          const fill = ebar.querySelector(".fill");
+          fill.style.width = Math.max(0, Math.min(100, p.energy)) + "%";
+          fill.classList.toggle("low", p.energy < 25);
+        }
+      }
+      if (ammoEl) ammoEl.style.display = isLaser ? "none" : "";
     });
 
     // score: one digit image per character

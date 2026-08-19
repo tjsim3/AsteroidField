@@ -222,7 +222,6 @@ window.DATA = (function () {
     "Screen Clear pays points but holds back the cash.",
     "Dead-center hits destroy the pieces that split off.",
     "Bullets that chain rocks keep a combo going - chase the x2, x3...",
-    "You earn 3/4 of your points back as money after each round.",
     "Use your second of recovery to get out of the way.",
     "Grab every dollar bill you can - it banks to real cash.",
     "Power-ups usually show up in groups - look for a second.",

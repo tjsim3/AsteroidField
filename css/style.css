@@ -442,6 +442,36 @@ button:focus-visible {
     drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.9));
 }
 
+/* Laser energy bar - replaces the bullet counter while the laser is on */
+.hud-laser-energy {
+  display: none;
+  align-items: center;
+  width: 132px;
+  height: 14px;
+  border: 1px solid rgba(127, 232, 255, 0.55);
+  border-radius: 999px;
+  background: rgba(8, 20, 32, 0.7);
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(55, 224, 255, 0.25), inset 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+.hud-laser-energy.on {
+  display: inline-flex;
+}
+
+.hud-laser-energy .fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #1fd0ff, #6ff0ff 45%, #ffffff);
+  box-shadow: 0 0 8px #37e0ff;
+  transition: width 0.08s linear;
+}
+
+.hud-laser-energy .fill.low {
+  background: linear-gradient(90deg, #ff7b6e, #ffa94d);
+}
+
 /* Score: one digit image per character */
 .score-digits {
   display: inline-flex;
