@@ -322,6 +322,7 @@ window.Game = (function () {
     // out, so only do this for live runs (state is PAUSED or PLAYING).
     const wasLiveRun = state === STATE.PLAYING || state === STATE.PAUSED;
     state = STATE.MENU;
+    SFX.laserHumStop();
     FX.clear();
     if (wasLiveRun) {
       const s = SAVE.load();
@@ -333,6 +334,7 @@ window.Game = (function () {
   function togglePause() {
     if (state === STATE.PLAYING) {
       state = STATE.PAUSED;
+      SFX.laserHumStop();
       document.getElementById("pause-overlay").classList.remove("hidden");
     } else if (state === STATE.PAUSED) {
       state = STATE.PLAYING;
@@ -396,6 +398,7 @@ window.Game = (function () {
     if (pauseKey && state === STATE.PLAYING) {
       togglePause();
       delete INPUT.keys.escape;   // so holding it doesn't instantly re-pause
+      return;   // skip the rest of this frame so the hum isn't restarted
     }
 
     const speed = G.playerSpeed;
@@ -472,14 +475,20 @@ window.Game = (function () {
         const firing = shoot && p.gunT > 0 && p.energy > 0;
         if (firing) {
           p.energy = Math.max(0, p.energy - 12 * dt);
-          if (!p.laserOn) p.laserOn = true;
+          if (!p.laserOn) {
+            p.laserOn = true;
+            SFX.gunLaserFire();
+          }
+          SFX.laserHum();   // idempotent - restarts itself after a pause
           beamSweep(p);
         }
         if (!firing && p.laserOn) {
           p.laserOn = false;
+          SFX.laserHumStop();
         }
         if (p.energy <= 0) {
           p.laserOn = false;
+          SFX.laserHumStop();
           p.gun = null;
           p.gunT = 0;
           p.laserCd = 0.8;   // brief cooldown so holding fire doesn't waste bullets
@@ -487,6 +496,7 @@ window.Game = (function () {
       } else if (p.laserOn) {
         // gun swapped or expired mid-beam
         p.laserOn = false;
+        SFX.laserHumStop();
       } else if (p.gun === "rapidfire") {
         p.rapidCd -= dt;
         if (p.rapidCd <= 0) {
@@ -696,7 +706,7 @@ window.Game = (function () {
     }
     FX.rocketExplode(x, y);
     FX.radiusRing(x, y, ROCKET_RANGE, "#ff7b4d");
-    SFX.bigBoom();
+    SFX.rocketBoom();
     return killed;
   }
 
@@ -709,8 +719,9 @@ window.Game = (function () {
    Runs asynchronously: a chain ticks one hop per frame. */
 const SHOCK_RANGE = 140;
 const SHOCK_PAUSE = 0;       // no buffer: hop every frame, so children are caught ASAP
-const SHOCK_MAX_HITS = 60;   // safety cap: high enough that a chain always reaches
-                             // the children of every rock it smashes
+const SHOCK_MAX_HITS = 1000; // generous safety cap: with ~7 smashes per rock family
+                             // (rock + 2 children + 4 grand-children) the OLD 60
+                             // cap clipped mid-wave and left split-off rocks alive
 
 function startShockChain(x, y) {
   shockChains.push({
@@ -875,12 +886,12 @@ function finishShockChain(ch, i) {
         bid: ++bulletId,
         combo: 0,
         comboPop: 0,
-        gun: "shotgun",
+gun: "shotgun",
         skin: p.bullet
       });
     }
     FX.muzzleFlash(p.x + 24, p.y);
-    SFX.shoot();
+    SFX.gunShotgunFire();
   }
 
   /* Rockets: one rocket per trigger pull; it blows up on the first rock it
@@ -899,7 +910,7 @@ function finishShockChain(ch, i) {
       skin: p.bullet
     });
     FX.muzzleFlash(p.x + 24, p.y);
-    SFX.shoot();
+    SFX.gunRocketsFire();
   }
 
   /* Shock: a bolt that jumps from asteroid to asteroid within range. */
@@ -917,7 +928,7 @@ function finishShockChain(ch, i) {
       skin: p.bullet
     });
     FX.muzzleFlash(p.x + 24, p.y);
-    SFX.shoot();
+    SFX.gunShockFire();
   }
 
   /* The laser's kill zone: a horizontal band that runs from the ship's nose
@@ -1072,6 +1083,7 @@ function finishShockChain(ch, i) {
       p.knockVy = dir * 240;
       p.knockT = 0.3;
       p.wobbleT = 0.4;
+      p.invulnT = 1;   // brief mercy window after the shield absorbs a hit
       return;
     }
 
@@ -1123,6 +1135,16 @@ function finishShockChain(ch, i) {
     rapidfire: "#ffe93a", shock: "#9ee6ff"
   };
 
+  /* Each gun power-up has its own pickup jingle (deep boom for rockets,
+     energy sweep for the laser, rat-a-tat for rapid fire...). */
+  const GUN_SFX = {
+    laser: SFX.gunLaser,
+    shotgun: SFX.gunShotgun,
+    rockets: SFX.gunRockets,
+    rapidfire: SFX.gunRapidfire,
+    shock: SFX.gunShock
+  };
+
   /* Timer-driven health drop: flies across the screen every 30s (then 31s,
    32s...) so you have to spot it and grab it. */
   function spawnHealthPickup() {
@@ -1167,12 +1189,14 @@ function finishShockChain(ch, i) {
     pl.rapidCd = 0;
     pl.energy = 100;
     pl.laserOn = false;
+    SFX.laserHumStop();
     pl.laserCd = 0;
     pl.ammo = Math.min(eff.maxAmmo, pl.ammo + 5);
     const f = PFX[id] || { color: "#ffffff", msg: "" };
     FX.pickupFx(pl.x, pl.y, f.color);
     FX.floatText(pl.x, pl.y - 40, f.msg, f.color, 18);
-    SFX.power();
+    const gunSfx = GUN_SFX[id];
+    if (gunSfx) gunSfx(); else SFX.power();
   }
 
   function spawnPowerup() {
@@ -1296,6 +1320,7 @@ function finishShockChain(ch, i) {
     // pay the run out twice.
     if (state === STATE.OVER) return;
     SFX.over();
+    SFX.laserHumStop();
     const save = SAVE.load();
 
     // pay out the cash earned this run

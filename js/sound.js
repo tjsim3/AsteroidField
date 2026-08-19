@@ -11,6 +11,7 @@ window.SFX = (function () {
   let ctx = null;
   let master = null;
   let volume = 0.8;          // 0 = muted, 1 = full blast
+  let laserNodes = null;     // live oscillator nodes while the laser beam hums
 
   function ensure() {
     if (ctx) return true;
@@ -19,7 +20,7 @@ window.SFX = (function () {
     try {
       ctx = new AC();
       master = ctx.createGain();
-      master.gain.value = volume * 0.85;
+      master.gain.value = volume * 1.15;
       master.connect(ctx.destination);
     } catch (e) {
       ctx = null;
@@ -38,7 +39,7 @@ window.SFX = (function () {
   /* 0 = muted, 1 = full. Set by the Sound slider in Settings. */
   function setVolume(v) {
     volume = Math.max(0, Math.min(1, Number(v) || 0));
-    if (master) master.gain.setTargetAtTime(volume * 0.85, ctx.currentTime, 0.02);
+    if (master) master.gain.setTargetAtTime(volume * 1.15, ctx.currentTime, 0.02);
   }
 
   /* A short pitch-bended tone (most of the blips/dings). */
@@ -59,9 +60,9 @@ window.SFX = (function () {
   }
 
   /* White-noise whoosh (explosions, thuds) shaped by a lowpass filter. */
-  function noise(dur, vol, filterFreq) {
+  function noise(dur, vol, filterFreq, delay) {
     if (!ctx || volume <= 0) return;
-    const t0 = ctx.currentTime;
+    const t0 = ctx.currentTime + (delay || 0);
     const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
     const buf = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = buf.getChannelData(0);
@@ -107,6 +108,108 @@ window.SFX = (function () {
     tone(880, 0.13, "triangle", 0.12, 1320, 0.08);
   }
 
+  /* Weapon-specific power-up jingles - a super-deep boom for rockets, a
+     bright energy sweep for the laser, rat-a-tat for rapid fire, etc. */
+  function gunRockets() {
+    noise(0.9, 0.55, 200);                 // long, low rumble
+    tone(52, 0.85, "sine", 0.32, 20);      // very deep boom
+    tone(110, 0.4, "triangle", 0.16, 40, 0.08);
+  }
+
+  function gunLaser() {
+    tone(1300, 0.15, "sawtooth", 0.13, 3200);   // charging sweep up
+    tone(2600, 0.14, "square", 0.1, 900, 0.03); // sharp energy crack
+  }
+
+  function gunShotgun() {
+    noise(0.13, 0.3, 800);
+    noise(0.3, 0.34, 450, 0.09);               // second barrel, deeper
+    tone(150, 0.32, "triangle", 0.14, 55);
+  }
+
+  function gunRapidfire() {
+    tone(960, 0.05, "square", 0.09, 620);
+    tone(1040, 0.05, "square", 0.09, 660, 0.05);
+    tone(1120, 0.05, "square", 0.09, 700, 0.1);
+  }
+
+  function gunShock() {
+    tone(2200, 0.09, "sawtooth", 0.12, 600);
+    tone(1800, 0.1, "sawtooth", 0.1, 380, 0.05);
+    tone(2400, 0.12, "square", 0.09, 500, 0.1);
+  }
+
+  /* Per-shot fire sounds for the guns (rapid fire keeps the normal blip).
+     These play on trigger; the equip jingles above stay for the pickups. */
+  function gunLaserFire() {
+    tone(1400, 0.18, "sawtooth", 0.13, 3200);   // beam ignition sweep
+    tone(800, 0.25, "square", 0.08, 300, 0.03); // low hum tail
+  }
+
+  function gunShotgunFire() {
+    noise(0.16, 0.32, 650);
+    tone(160, 0.16, "triangle", 0.14, 70);
+  }
+
+  function gunRocketsFire() {
+    noise(0.35, 0.3, 900);                     // launch whoosh
+    tone(180, 0.25, "sawtooth", 0.12, 520);    // rising thrust
+  }
+
+  function gunShockFire() {
+    tone(2000, 0.09, "sawtooth", 0.11, 500);
+    tone(2600, 0.1, "square", 0.08, 800, 0.02);
+  }
+
+  /* Continuous hum while the laser beam is held. Call laserHum() when the
+     beam turns on and laserHumStop() when it releases - both are safe to
+     call repeatedly. A low square sub-oscillator adds body, and an LFO
+     wobbles the filter cutoff so it sounds alive. */
+  function laserHum() {
+    if (!ensure()) return;
+    if (volume <= 0 || laserNodes) return;
+    const osc = ctx.createOscillator();
+    const sub = ctx.createOscillator();
+    const lfo = ctx.createOscillator();
+    const lfoG = ctx.createGain();
+    const f = ctx.createBiquadFilter();
+    const g = ctx.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.value = 950;
+    sub.type = "square";
+    sub.frequency.value = 55;
+    lfo.type = "sine";
+    lfo.frequency.value = 6;
+    lfoG.gain.value = 180;                // wobbles the filter cutoff
+    f.type = "lowpass";
+    f.frequency.value = 2200;
+    f.Q.value = 2;
+    g.gain.value = 0;
+    lfo.connect(lfoG);
+    lfoG.connect(f.frequency);
+    osc.connect(f);
+    sub.connect(f);
+    f.connect(g);
+    g.connect(master);
+    g.gain.setTargetAtTime(0.05, ctx.currentTime, 0.03);
+    osc.start();
+    sub.start();
+    lfo.start();
+    laserNodes = { osc: osc, sub: sub, lfo: lfo, g: g };
+  }
+
+  function laserHumStop() {
+    if (!laserNodes) return;
+    laserNodes.g.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    const t = ctx.currentTime + 0.4;
+    try {
+      laserNodes.osc.stop(t);
+      laserNodes.sub.stop(t);
+      laserNodes.lfo.stop(t);
+    } catch (e) {}
+    laserNodes = null;
+  }
+
   function heal() {
     tone(520, 0.12, "sine", 0.16, 660);
     tone(660, 0.12, "sine", 0.14, 780, 0.09);
@@ -127,6 +230,14 @@ window.SFX = (function () {
     tone(90, 0.6, "triangle", 0.24, 28);
   }
 
+  /* A heavier, deeper blast for rocket impacts - the lighter bigBoom stays
+     for screen clears. */
+  function rocketBoom() {
+    noise(0.85, 0.6, 400);
+    tone(85, 0.7, "triangle", 0.4, 22);
+    tone(58, 0.6, "sine", 0.35, 16, 0.03);
+  }
+
   function over() {
     tone(440, 0.25, "square", 0.13, 220);
     tone(330, 0.25, "square", 0.13, 165, 0.22);
@@ -145,6 +256,9 @@ window.SFX = (function () {
 
   return {
     unlock, setVolume, shoot, boom, hurt, coin, power, heal,
-    slowMo, zap, bigBoom, over, click, unlockFx
+    slowMo, zap, bigBoom, rocketBoom, over, click, unlockFx,
+    gunLaser, gunShotgun, gunRockets, gunRapidfire, gunShock,
+    gunLaserFire, gunShotgunFire, gunRocketsFire, gunShockFire,
+    laserHum, laserHumStop
   };
 })();
