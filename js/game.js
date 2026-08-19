@@ -57,7 +57,6 @@ window.Game = (function () {
   let healCd = 30;        // seconds until the next automatic +1 life
   let healsDone = 0;      // completed auto-heals (each one adds 1s to the gap)
   let gunCd = 60;         // seconds until the next gun powerup drifts by
-  let gunIndex = 0;       // which gun is next to appear (cycles through them)
   let lastScore = -1;
   let lastOpts = {};       // the options the current run was started with
   let bulletId = 0;        // stable id per bullet (drives combo list keys & pulse)
@@ -208,6 +207,7 @@ window.Game = (function () {
         knockT: 0,         // seconds of knockback left
         invulnT: 0,        // seconds of invulnerability left
         fireCd: 0,         // seconds before the next shot is allowed
+        laserCd: 0,        // cooldown after the laser burns out (blocks waste-fire)
         trail: [],         // ghost clones streaming off the back of the ship
         ctrl: ctrl,        // which keys move / fire this player
         ship: ship,        // this player's ship skin
@@ -282,7 +282,6 @@ window.Game = (function () {
     healCd = 30;
     healsDone = 0;
     gunCd = 60;
-    gunIndex = 0;
 
     state = STATE.PLAYING;
     document.getElementById("gameover-overlay").classList.add("hidden");
@@ -391,6 +390,7 @@ window.Game = (function () {
       // per-player status timers
       p.invulnT = Math.max(0, p.invulnT - dt);
       p.fireCd = Math.max(0, p.fireCd - dt);
+      p.laserCd = Math.max(0, p.laserCd - dt);
 
       // ---- ship pitch ----
       // The ship tilts ~30deg toward the held direction; the angle eases to the
@@ -450,6 +450,7 @@ window.Game = (function () {
           p.laserOn = false;
           p.gun = null;
           p.gunT = 0;
+          p.laserCd = 0.8;   // brief cooldown so holding fire doesn't waste bullets
         }
       } else if (p.laserOn) {
         // gun swapped or expired mid-beam
@@ -460,7 +461,7 @@ window.Game = (function () {
           p.rapidCd = 0.09;
           fireGun(p);
         }
-      } else if (shoot && p.ammo > 0 && p.fireCd <= 0) {
+      } else if (shoot && p.ammo > 0 && p.fireCd <= 0 && p.laserCd <= 0) {
         fire(p);
       }
     }
@@ -497,8 +498,7 @@ window.Game = (function () {
       spawnHealthPickup();
     }
 
-    // ---- gun drops: one weapon pickup flies by every 60s, cycling
-    //      through laser, shotgun, rockets, rapid fire, shock ----
+    // ---- gun drops: one random weapon pickup flies by every 60s ----
     gunCd -= dt;
     if (gunCd <= 0) {
       gunCd = 60;
@@ -1017,12 +1017,11 @@ window.Game = (function () {
     });
   }
 
-  /* One gun pickup per minute, cycling laser -> shotgun -> rockets ->
-     rapid fire -> shock (then back around). */
+  /* One gun pickup every 60 seconds, picking a random weapon each time
+   (laser, shotgun, rockets, rapid fire or shock - all equally likely). */
   const GUN_ORDER = ["laser", "shotgun", "rockets", "rapidfire", "shock"];
   function spawnGunPickup() {
-    const id = GUN_ORDER[gunIndex % GUN_ORDER.length];
-    gunIndex++;
+    const id = GUN_ORDER[(Math.random() * GUN_ORDER.length) | 0];
     powerups.push({
       id: id,
       icon: DATA.dropIcons[id],
@@ -1043,6 +1042,7 @@ window.Game = (function () {
     pl.rapidCd = 0;
     pl.energy = 100;
     pl.laserOn = false;
+    pl.laserCd = 0;
     pl.ammo = Math.min(G.maxAmmo, pl.ammo + 5);
     const f = PFX[id] || { color: "#ffffff", msg: "" };
     FX.pickupFx(pl.x, pl.y, f.color);
