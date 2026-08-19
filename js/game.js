@@ -48,6 +48,7 @@ window.Game = (function () {
   let asteroids = [];
   let powerups = [];
   let comboGhosts = [];    // faded combo labels that outlive their bullet (3s)
+  let shockChains = [];    // active chain-lightning: hops rock to rock with tiny pauses
 
   // ---------- timers / status ----------
   let slowT = 0;
@@ -254,6 +255,7 @@ window.Game = (function () {
     asteroids = [];
     powerups = [];
     comboGhosts = [];
+    shockChains = [];
 
     runTime = 0;
     score = 0;
@@ -293,8 +295,17 @@ window.Game = (function () {
   }
 
   function exitToMenu() {
+    // Roll this run's combo totals into the lifetime stats so the "total
+    // combos" achievements keep progressing even when a run is quit from
+    // the pause menu. On the death path gameOver() already paid the run
+    // out, so only do this for live runs (state is PAUSED or PLAYING).
+    const wasLiveRun = state === STATE.PLAYING || state === STATE.PAUSED;
     state = STATE.MENU;
     FX.clear();
+    if (wasLiveRun) {
+      const s = SAVE.load();
+      s.stats.bestCombo = Math.max(s.stats.bestCombo || 0, runStats.maxCombo);
+    }
     SAVE.save();
   }
 
@@ -538,6 +549,9 @@ window.Game = (function () {
       if (g.t <= 0) comboGhosts.splice(i, 1);
     }
 
+    // ---- shock chains: hop another rock after each short buffer ----
+    updateShockChains(dt);
+
     // ---- asteroids ----
     const slowMul = slowT > 0 ? 0.5 : 1;
     for (let i = asteroids.length - 1; i >= 0; i--) {
@@ -628,10 +642,7 @@ window.Game = (function () {
           return;
         }
         if (b.gun === "shock") {
-          b.combo = shockChain(b.x, b.y);
-          b.comboPop = 0.15;
-          if (b.combo > runStats.maxCombo) runStats.maxCombo = b.combo;
-          addComboTotal(b.combo);
+          startShockChain(b.x, b.y);
           bullets.splice(bi, 1);
           return;
         }
@@ -668,40 +679,95 @@ window.Game = (function () {
     return killed;
   }
 
-  /* Shock: chain lightning - the bolt eats a rock, then jumps to any rock
-     within range of it, and so on. Returns how many rocks it zapped. */
-  const SHOCK_RANGE = 140;
-  function shockChain(x, y) {
-    const rangeOf = function (ax, ay) {
-      return function (o) {
-        return circleHit(ax, ay, SHOCK_RANGE, o.x, o.y, o.r);
-      };
-    };
-    let pending = asteroids.filter(rangeOf(x, y));
-    const hit = [];
-    while (pending.length) {
-      const a = pending.pop();
-      if (hit.indexOf(a) > -1) continue;
-      hit.push(a);
-      asteroids.forEach(function (o) {
-        if (hit.indexOf(o) < 0 && rangeOf(a.x, a.y)(o)) pending.push(o);
-      });
-      if (hit.length > 1) FX.lightning(a.x, a.y, hit[hit.length - 2].x, hit[hit.length - 2].y);
+  /* Shock: chain lightning. The bolt eats a rock, then - with no buffer at
+   all - every rock within range of ANY struck rock is struck too. Because
+   the chain branches (two rocks in range are BOTH struck, and each becomes
+   a new end that reaches further), a dense screen gets hit all at once.
+   Children spawn instantly when a rock is smashed, so they sit in the arena
+   in time for the very next hop.
+   Runs asynchronously: a chain ticks one hop per frame. */
+const SHOCK_RANGE = 140;
+const SHOCK_PAUSE = 0;       // no buffer: hop every frame, so children are caught ASAP
+const SHOCK_MAX_HITS = 24;   // safety cap so a dense screen can't drag forever
+
+function startShockChain(x, y) {
+  shockChains.push({
+    tips: [{ x: x, y: y }],  // frontier points; every rock in range of any tip is struck
+    hit: [],                 // the asteroid objects this chain has destroyed
+    delay: 0                 // countdown until the next hop
+  });
+}
+
+/* Advance every active chain one tick. When a hop's buffer runs out, strike
+   EVERY untapped rock in range of any tip (so the chain branches), then the
+   struck rocks become the new tips - their freshly-spawned children are
+   within range and get eaten on the next hop. */
+function updateShockChains(dt) {
+  for (let i = shockChains.length - 1; i >= 0; i--) {
+    const ch = shockChains[i];
+    ch.delay -= dt;
+    if (ch.delay > 0) continue;
+
+    // gather every (tip, rock) pair in range; a rock counts once even if
+    // several tips can reach it
+    const targets = [];
+    const seen = new Set();
+    for (let ti = 0; ti < ch.tips.length; ti++) {
+      const tip = ch.tips[ti];
+      for (let ai = 0; ai < asteroids.length; ai++) {
+        const a = asteroids[ai];
+        if (ch.hit.indexOf(a) > -1 || seen.has(a)) continue;
+        const d = Math.hypot(a.x - tip.x, a.y - tip.y);
+        if (d <= SHOCK_RANGE + a.r) {
+          seen.add(a);
+          targets.push({ a: a, from: tip });
+        }
+      }
     }
-    hit.forEach(function (a) { destroyAsteroid(a, false); });
-    if (hit.length) SFX.zap();
-    return hit.length;
+
+    if (!targets.length || ch.hit.length >= SHOCK_MAX_HITS) {
+      finishShockChain(ch, i);
+      continue;
+    }
+
+    // strike them all this hop (up to the safety cap): one bolt per rock,
+    // each struck rock becomes a new tip for the next hop
+    const newTips = [];
+    for (let ti = 0; ti < targets.length && ch.hit.length < SHOCK_MAX_HITS; ti++) {
+      const t = targets[ti];
+      FX.lightning(t.from.x, t.from.y, t.a.x, t.a.y);
+      SFX.zap();
+      ch.hit.push(t.a);
+      destroyAsteroid(t.a, false);
+      newTips.push({ x: t.a.x, y: t.a.y });
+    }
+    ch.tips = newTips;
+    ch.delay = SHOCK_PAUSE;
   }
+}
+
+/* The chain's hop counter is its combo: cash it into run stats and the
+   lifetime accumulated-combo total exactly like a bullet's combo would. */
+function finishShockChain(ch, i) {
+  const k = ch.hit.length;
+  if (k > runStats.maxCombo) runStats.maxCombo = k;
+  addComboTotal(k);
+  shockChains.splice(i, 1);
+}
 
   /* Each finished combo (a bullet that punched through rocks) adds its size
    to the lifetime accumulated-combo total; unlocks live when a goal is hit. */
   const COMBO_TOTAL_ACH = [[500, "combos_500"], [1000, "combos_1000"], [5000, "combos_5000"]];
   function addComboTotal(n) {
     runStats.comboTotal += n;
-    const cumulative = SAVE.load().stats.comboTotal + runStats.comboTotal;
+    // persist straight to the lifetime total so it tracks live while the
+    // game runs (and survives quitting mid-run); unlocks from that same value
+    const s = SAVE.load();
+    s.stats.comboTotal = (s.stats.comboTotal || 0) + n;
     COMBO_TOTAL_ACH.forEach(function (c) {
-      if (cumulative >= c[0]) UI.unlock(c[1]);
+      if (s.stats.comboTotal >= c[0]) UI.unlock(c[1]);
     });
+    SAVE.save();
   }
 
   /* Difficulty driver for asteroid spawn cadence.
@@ -1178,7 +1244,6 @@ window.Game = (function () {
     save.stats.timesDowned = (save.stats.timesDowned || 0) +
       players.reduce(function (sum, p) { return sum + p.damageTaken; }, 0);
     save.stats.bestCombo = Math.max(save.stats.bestCombo || 0, runStats.maxCombo);
-    save.stats.comboTotal = (save.stats.comboTotal || 0) + runStats.comboTotal;
     const pk = save.stats.pickups = save.stats.pickups || {};
     ["money", "reload", "health", "slow", "shrink", "clear",
      "laser", "shotgun", "rockets", "rapidfire", "shock"].forEach(function (k) {

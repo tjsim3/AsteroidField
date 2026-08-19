@@ -146,6 +146,7 @@ window.UI = (function () {
       ["Asteroids Blasted by Shots", num(st.asteroidsByBullets)],
       ["Damage Hits Taken", num(st.timesDowned)],
       ["Best Shot Combo", '<span class="combo-stat">x' + (st.bestCombo || 0) + "</span>"],
+      ["Total Combos", num(st.comboTotal)],
       ["Shop Drops Opened", num(st.dropsBought)],
       ["Dollar Bills Collected", num(pk.money)],
       ["Reload Packs Found", num(pk.reload)],
