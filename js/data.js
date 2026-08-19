@@ -226,7 +226,7 @@ window.DATA = (function () {
     "Use your second of recovery to get out of the way.",
     "Grab every dollar bill you can - it banks to real cash.",
     "Power-ups usually show up in groups - look for a second.",
-    "Gun drops (laser, shotgun, rockets, rapid fire, shock) change your shots for a while - grab one before it drifts past.",
+    "A gun drop (laser, shotgun, rockets, rapid fire, shock) flies by every minute - grab it to swap your shots and reload +5 bullets.",
     "You can squeeze through small gaps if you keep moving."
   ];
 

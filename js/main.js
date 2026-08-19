@@ -171,21 +171,35 @@ window.INPUT = { keys: {} };
     });
   });
 
-  // Cheat code: type "FREE" on the Store screen to toggle free drops.
+  // Cheat code: type "FREE" on the Store screen to toggle free drops, and
+  // type a weapon code anywhere (menu or in a run) to equip that gun on P1.
+  //   LASER / SHOT / ROCKET / RAPID / SHOCK
+  const GUN_CODES = {
+    LASER: "laser", SHOT: "shotgun", ROCKET: "rockets", RAPID: "rapidfire", SHOCK: "shock"
+  };
   let cheatBuf = "";
   document.addEventListener("keydown", function (e) {
     if (e.repeat) return;
-    if (!$("screen-store").classList.contains("hidden")) {
-      if (e.key && e.key.length === 1) cheatBuf += e.key.toUpperCase();
-      if (cheatBuf.length > 4) cheatBuf = cheatBuf.slice(-4);
-      if (cheatBuf === "FREE") {
+    if (e.key && e.key.length === 1) {
+      cheatBuf += e.key.toUpperCase();
+      if (cheatBuf.length > 7) cheatBuf = cheatBuf.slice(-7);
+      if (cheatBuf === "FREE" && !$("screen-store").classList.contains("hidden")) {
         const on = !UI.isFreeDrops();
         UI.setFreeDrops(on);
         UI.notify(on ? "Cheat on: drops are FREE" : "Cheat off", null);
         cheatBuf = "";
+      } else {
+        const hit = Object.keys(GUN_CODES).find(function (c) { return cheatBuf.endsWith(c); });
+        if (hit) {
+          const id = GUN_CODES[hit];
+          if (Game.grantGun(id)) {
+            UI.notify("Cheat: loaded " + hit, null);
+          } else {
+            UI.notify("Cheat: " + hit + " ready - start a run first", null);
+          }
+          cheatBuf = "";
+        }
       }
-    } else {
-      cheatBuf = "";
     }
   });
 

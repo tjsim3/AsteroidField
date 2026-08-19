@@ -53,6 +53,8 @@ window.Game = (function () {
   let powerupCd = 2.5;
   let healCd = 30;        // seconds until the next automatic +1 life
   let healsDone = 0;      // completed auto-heals (each one adds 1s to the gap)
+  let gunCd = 60;         // seconds until the next gun powerup drifts by
+  let gunIndex = 0;       // which gun is next to appear (cycles through them)
   let lastScore = -1;
   let lastOpts = {};       // the options the current run was started with
   let bulletId = 0;        // stable id per bullet (drives combo list keys & pulse)
@@ -271,6 +273,8 @@ window.Game = (function () {
     powerupCd = 2.5;
     healCd = 30;
     healsDone = 0;
+    gunCd = 60;
+    gunIndex = 0;
 
     state = STATE.PLAYING;
     document.getElementById("gameover-overlay").classList.add("hidden");
@@ -462,6 +466,14 @@ window.Game = (function () {
       healCd = 30 + healsDone;
       healsDone++;
       spawnHealthPickup();
+    }
+
+    // ---- gun drops: one weapon pickup flies by every 60s, cycling
+    //      through laser, shotgun, rockets, rapid fire, shock ----
+    gunCd -= dt;
+    if (gunCd <= 0) {
+      gunCd = 60;
+      spawnGunPickup();
     }
 
     // ---- bullets ----
@@ -997,6 +1009,11 @@ window.Game = (function () {
     rapidfire: "RAPID FIRE", shock: "SHOCK"
   };
 
+  const GUN_COLORS = {
+    laser: "#6ff0ff", shotgun: "#ffa94d", rockets: "#ff7b4d",
+    rapidfire: "#ffe93a", shock: "#9ee6ff"
+  };
+
   /* Timer-driven health drop: flies across the screen every 30s (then 31s,
    32s...) so you have to spot it and grab it. */
   function spawnHealthPickup() {
@@ -1011,6 +1028,37 @@ window.Game = (function () {
     });
   }
 
+  /* One gun pickup per minute, cycling laser -> shotgun -> rockets ->
+     rapid fire -> shock (then back around). */
+  const GUN_ORDER = ["laser", "shotgun", "rockets", "rapidfire", "shock"];
+  function spawnGunPickup() {
+    const id = GUN_ORDER[gunIndex % GUN_ORDER.length];
+    gunIndex++;
+    powerups.push({
+      id: id,
+      icon: DATA.dropIcons[id],
+      x: W + 60,
+      baseY: 50 + Math.random() * Math.max(1, H - 100),
+      y: 0,
+      vx: -160 - Math.random() * 40,
+      t: Math.random() * 6
+    });
+  }
+
+  /* Equip a gun on a player: swaps their shots for dur seconds, tops up
+     their ammo by 5, and flashes the pickup effect. Also used by cheats. */
+  function applyGun(pl, id) {
+    const def = DATA.powerups.find(function (d) { return d.id === id; });
+    pl.gun = id;
+    pl.gunT = def ? def.dur : 30;
+    pl.rapidCd = 0;
+    pl.ammo = Math.min(G.maxAmmo, pl.ammo + 5);
+    const f = PFX[id] || { color: "#ffffff", msg: "" };
+    FX.pickupFx(pl.x, pl.y, f.color);
+    FX.floatText(pl.x, pl.y - 40, f.msg, f.color, 18);
+    SFX.power();
+  }
+
   function spawnPowerup() {
     // Money's spawn weight was cut to a third of what it used to be:
     // it now keeps a steady weight of 1 (about 1-in-8 drops at any
@@ -1020,6 +1068,8 @@ window.Game = (function () {
     const pool = [];
     for (let k = 0; k < moneyW; k++) pool.push("money");
     DATA.powerups.forEach(function (p) {
+      // guns show up on their own 60-second timer, not in the random pool
+      if (p.dur) return;
       // weight controls how often a drop spawns (reload shows up more)
       const w = p.weight || 1;
       for (let k = 0; k < w; k++) pool.push(p.id);
@@ -1100,13 +1150,8 @@ window.Game = (function () {
       SFX.bigBoom();
     } else if (pwr.id === "laser" || pwr.id === "shotgun" || pwr.id === "rockets" ||
                pwr.id === "rapidfire" || pwr.id === "shock") {
-      // gun powerup: swap this player's shots for a while
-      const def = DATA.powerups.find(function (d) { return d.id === pwr.id; });
-      pl.gun = pwr.id;
-      pl.gunT = def ? def.dur : 30;
-      pl.rapidCd = 0;
-      FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 18);
-      SFX.power();
+      // gun powerup: swap this player's shots for a while (+5 bullets)
+      applyGun(pl, pwr.id);
     }
 
     // lifetime collection stat
@@ -1265,6 +1310,25 @@ window.Game = (function () {
         ctx.lineWidth = 2;
         ctx.stroke();
         drawSprite(p.icon, p.x, p.y, 46, 46, 0);
+      } else if (p.id === "laser" || p.id === "shotgun" || p.id === "rockets" ||
+                 p.id === "rapidfire" || p.id === "shock") {
+        // gun drop: glowing ring in the weapon's color so it pops
+        const gcol = GUN_COLORS[p.id] || "#ffffff";
+        const pulse = 0.5 + 0.5 * Math.sin(p.t * 5);
+        ctx.save();
+        ctx.globalAlpha = 0.3 + 0.22 * pulse;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 32 + 8 * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = gcol;
+        ctx.fill();
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 30, 0, Math.PI * 2);
+        ctx.strokeStyle = gcol;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        ctx.restore();
+        drawSprite(p.icon, p.x, p.y, 40, 40, 0);
       } else {
         drawSprite(p.icon, p.x, p.y, 34, 34, 0);
       }
@@ -1366,6 +1430,28 @@ window.Game = (function () {
       if (!dead) {
         const blink = p.invulnT > 0 && Math.floor(runTime * 12) % 2 === 0;
         if (!blink) {
+          // vibrant gun aura: a pulsing ring + orbiting sparks in the
+          // weapon's color while a gun powerup is active
+          if (p.gunT > 0) {
+            const gcol = GUN_COLORS[p.gun] || GUN_COLORS.laser;
+            const pulse = 0.5 + 0.5 * Math.sin(runTime * 5 + p.name.charCodeAt(0));
+            ctx.save();
+            ctx.globalAlpha = 0.4 + 0.3 * pulse;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 40, 0, Math.PI * 2);
+            ctx.strokeStyle = gcol;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.globalAlpha = 0.9;
+            for (let s = 0; s < 3; s++) {
+              const ang = runTime * 3.2 + s * ((Math.PI * 2) / 3);
+              ctx.fillStyle = gcol;
+              ctx.beginPath();
+              ctx.arc(p.x + Math.cos(ang) * 46, p.y + Math.sin(ang) * 46, 2.6, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.restore();
+          }
           drawSprite(ASSETS_SRC(p.ship), p.x, p.y, shipW, shipH, p.pitch + p.wobble);
         }
       }
@@ -1600,6 +1686,13 @@ window.Game = (function () {
     exitToMenu,
     togglePause,
     updateHUD,
+    // Cheat helper: equip a gun on P1 (active run required).
+    grantGun: function (id) {
+      const pl = players[0];
+      if (!pl) return false;
+      applyGun(pl, id);
+      return true;
+    },
     isOver: function () { return state === STATE.OVER; },
     isInGame: function () { return state === STATE.PLAYING || state === STATE.PAUSED; }
   };
