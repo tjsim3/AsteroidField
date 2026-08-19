@@ -146,7 +146,7 @@ window.DATA = (function () {
     { id: "clear", name: "Screen Clear", desc: "A mighty blast destroys every asteroid on screen. Ka-boom!", icon: "AsteroidsAndPowerups/ClearScreen2.svg", weight: 1 },
     // gun powerups - they override your shots for a while (dur = seconds)
     { id: "laser", name: "Laser", desc: "Your shots become a blazing energy beam for 30 seconds.", icon: "AsteroidsAndPowerups/Laser.svg", weight: 1, dur: 30 },
-    { id: "shotgun", name: "Shotgun", desc: "Blast 5 pellets in a spread for 30 seconds.", icon: "AsteroidsAndPowerups/Shotgun.svg", weight: 1, dur: 30 },
+    { id: "shotgun", name: "Shotgun", desc: "Blast 9 pellets in a spread for 30 seconds.", icon: "AsteroidsAndPowerups/Shotgun.svg", weight: 1, dur: 30 },
     { id: "rockets", name: "Rockets", desc: "Fire rockets that explode in a firey blast on impact, for 30 seconds.", icon: "AsteroidsAndPowerups/Rockets.svg", weight: 1, dur: 30 },
     { id: "rapidfire", name: "Rapid Fire", desc: "Auto-fire for 10 seconds without using any bullets.", icon: "AsteroidsAndPowerups/RapidFire.svg", weight: 1, dur: 10 },
     { id: "shock", name: "Shock", desc: "Chain lightning that leaps between nearby asteroids, for 30 seconds.", icon: "AsteroidsAndPowerups/Shock.svg", weight: 1, dur: 30 }

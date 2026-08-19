@@ -35,7 +35,10 @@ window.Game = (function () {
     cashBonus: 0,        // $ from full-health pickups
     scoreSurvival: 0,
     scoreAsteroids: 0,
-    pickups: { money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0 }
+    pickups: {
+      money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0,
+      laser: 0, shotgun: 0, rockets: 0, rapidfire: 0, shock: 0
+    }
   };
 
   // ---------- entities ----------
@@ -217,7 +220,6 @@ window.Game = (function () {
         rapidCd: 0,        // auto-fire interval clock while rapid fire is active
         energy: 100,       // laser-only battery; drains while the beam is held
         laserOn: false,    // whether the laser beam is firing right now
-        beamKills: 0,      // rocks this laser streak has destroyed (reset on release)
         damageTaken: 0,    // how many times this player got hit (for the end screen)
         diedAt: null,      // runTime (seconds) when this player went down, null if alive
         bulletsFired: 0    // for the end screen
@@ -267,7 +269,10 @@ window.Game = (function () {
       cashBonus: 0,
       scoreSurvival: 0,
       scoreAsteroids: 0,
-      pickups: { money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0 }
+      pickups: {
+        money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0,
+        laser: 0, shotgun: 0, rockets: 0, rapidfire: 0, shock: 0
+      }
     };
 
     slowT = 0;
@@ -439,18 +444,15 @@ window.Game = (function () {
           beamSweep(p);
         }
         if (!firing && p.laserOn) {
-          finishLaserBeam(p);
           p.laserOn = false;
         }
         if (p.energy <= 0) {
-          finishLaserBeam(p);
           p.laserOn = false;
           p.gun = null;
           p.gunT = 0;
         }
       } else if (p.laserOn) {
         // gun swapped or expired mid-beam
-        finishLaserBeam(p);
         p.laserOn = false;
       } else if (p.gun === "rapidfire") {
         p.rapidCd -= dt;
@@ -769,74 +771,26 @@ window.Game = (function () {
      update) replaces shots entirely, so there's no projectile for it. */
   function fireLaser(p) { fireBullet(p); }
 
-  /* Shotgun: five pellets, 30/15/0/-15/-30 degrees. Each pellet acts like
-     a normal falling bullet (combo and all). */
+  /* Shotgun: nine pellets spread evenly across a 60-degree fan
+     (-30 to +30, in 7.5 steps). Each pellet acts like a normal
+     falling bullet (combo and all). */
   function fireShotgun(p) {
-    bullets.push({
-      x: p.x + 26,
-      y: p.y,
-      vx: 1050 * Math.cos((-30 * Math.PI) / 180),
-      vy: 1050 * Math.sin((-30 * Math.PI) / 180),
-      r: 11,
-      hits: 0,
-      bid: ++bulletId,
-      combo: 0,
-      comboPop: 0,
-      gun: "shotgun",
-      skin: p.bullet
-    });
-    bullets.push({
-      x: p.x + 26,
-      y: p.y,
-      vx: 1050 * Math.cos((-15 * Math.PI) / 180),
-      vy: 1050 * Math.sin((-15 * Math.PI) / 180),
-      r: 11,
-      hits: 0,
-      bid: ++bulletId,
-      combo: 0,
-      comboPop: 0,
-      gun: "shotgun",
-      skin: p.bullet
-    });
-    bullets.push({
-      x: p.x + 26,
-      y: p.y,
-      vx: 1050,
-      vy: 0,
-      r: 11,
-      hits: 0,
-      bid: ++bulletId,
-      combo: 0,
-      comboPop: 0,
-      gun: "shotgun",
-      skin: p.bullet
-    });
-    bullets.push({
-      x: p.x + 26,
-      y: p.y,
-      vx: 1050 * Math.cos((15 * Math.PI) / 180),
-      vy: 1050 * Math.sin((15 * Math.PI) / 180),
-      r: 11,
-      hits: 0,
-      bid: ++bulletId,
-      combo: 0,
-      comboPop: 0,
-      gun: "shotgun",
-      skin: p.bullet
-    });
-    bullets.push({
-      x: p.x + 26,
-      y: p.y,
-      vx: 1050 * Math.cos((30 * Math.PI) / 180),
-      vy: 1050 * Math.sin((30 * Math.PI) / 180),
-      r: 11,
-      hits: 0,
-      bid: ++bulletId,
-      combo: 0,
-      comboPop: 0,
-      gun: "shotgun",
-      skin: p.bullet
-    });
+    for (let i = 0; i < 9; i++) {
+      const deg = -30 + i * 7.5;
+      bullets.push({
+        x: p.x + 26,
+        y: p.y,
+        vx: 1050 * Math.cos((deg * Math.PI) / 180),
+        vy: 1050 * Math.sin((deg * Math.PI) / 180),
+        r: 11,
+        hits: 0,
+        bid: ++bulletId,
+        combo: 0,
+        comboPop: 0,
+        gun: "shotgun",
+        skin: p.bullet
+      });
+    }
     FX.muzzleFlash(p.x + 24, p.y);
     SFX.shoot();
   }
@@ -880,7 +834,8 @@ window.Game = (function () {
 
   /* The laser's kill zone: a horizontal band that runs from the ship's nose
      to the far edge of the screen. Anything overlapping it while the beam is
-     held is destroyed - but only IN FRONT of the player, never behind them. */
+     held is destroyed - but only IN FRONT of the player, never behind them.
+     Each kill just scores; the laser never collects combos. */
   function beamSweep(p) {
     const band = 22;
     const x1 = p.x + 22;   // where the beam leaves the nose
@@ -888,23 +843,8 @@ window.Game = (function () {
       const a = asteroids[i];
       if (Math.abs(a.y - p.y) <= band + a.r &&
           a.x + a.r >= x1 && a.x <= W) {
-        p.beamKills++;
         destroyAsteroid(a, false);
       }
-    }
-  }
-
-  /* When the beam stops (released, expired, or the gun is swapped), cash in
-     the streak as a combo. */
-  function finishLaserBeam(p) {
-    const k = p.beamKills || 0;
-    p.beamKills = 0;
-    if (k >= 2) {
-      runStats.comboKills += k;
-      if (k > runStats.maxCombo) runStats.maxCombo = k;
-      UI.unlock("long_" + k);
-      addComboTotal(k);
-      comboGhosts.push({ x: p.x + 160, y: p.y - 20, combo: k, t: 3, bid: ++bulletId });
     }
   }
 
@@ -1103,7 +1043,6 @@ window.Game = (function () {
     pl.rapidCd = 0;
     pl.energy = 100;
     pl.laserOn = false;
-    pl.beamKills = 0;
     pl.ammo = Math.min(G.maxAmmo, pl.ammo + 5);
     const f = PFX[id] || { color: "#ffffff", msg: "" };
     FX.pickupFx(pl.x, pl.y, f.color);
@@ -1203,6 +1142,7 @@ window.Game = (function () {
     } else if (pwr.id === "laser" || pwr.id === "shotgun" || pwr.id === "rockets" ||
                pwr.id === "rapidfire" || pwr.id === "shock") {
       // gun powerup: swap this player's shots for a while (+5 bullets)
+      runStats.pickups[pwr.id]++;
       applyGun(pl, pwr.id);
     }
 
@@ -1240,7 +1180,8 @@ window.Game = (function () {
     save.stats.bestCombo = Math.max(save.stats.bestCombo || 0, runStats.maxCombo);
     save.stats.comboTotal = (save.stats.comboTotal || 0) + runStats.comboTotal;
     const pk = save.stats.pickups = save.stats.pickups || {};
-    ["money", "reload", "health", "slow", "shrink", "clear"].forEach(function (k) {
+    ["money", "reload", "health", "slow", "shrink", "clear",
+     "laser", "shotgun", "rockets", "rapidfire", "shock"].forEach(function (k) {
       pk[k] = (pk[k] || 0) + runStats.pickups[k];
     });
 
@@ -1312,6 +1253,11 @@ window.Game = (function () {
         '<div><span>Health Restores</span><span>' + st.pickups.health + '</span></div>' +
         '<div><span>Slow-Mo</span><span>' + st.pickups.slow + '</span></div>' +
         '<div><span>Shrink</span><span>' + st.pickups.shrink + '</span></div>' +
+        '<div><span>Laser</span><span>' + (st.pickups.laser || 0) + '</span></div>' +
+        '<div><span>Shotgun</span><span>' + (st.pickups.shotgun || 0) + '</span></div>' +
+        '<div><span>Rockets</span><span>' + (st.pickups.rockets || 0) + '</span></div>' +
+        '<div><span>Rapid Fire</span><span>' + (st.pickups.rapidfire || 0) + '</span></div>' +
+        '<div><span>Shock</span><span>' + (st.pickups.shock || 0) + '</span></div>' +
         '<div><span>Screen Clears</span><span>' + st.pickups.clear + '</span></div>' +
       '</div>' +
 

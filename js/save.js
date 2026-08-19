@@ -43,7 +43,8 @@ window.SAVE = (function () {
         bestCombo: 0,            // highest combo a single bullet ever reached
         comboTotal: 0,           // total combo value accumulated (each finished combo adds its size)
         pickups: {               // lifetime pickups found
-          money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0
+          money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0,
+          laser: 0, shotgun: 0, rockets: 0, rapidfire: 0, shock: 0
         }
       },
       achievements: {},          // { id: true } when unlocked

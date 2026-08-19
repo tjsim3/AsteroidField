@@ -140,6 +140,23 @@ window.INPUT = { keys: {} };
   $("achievements-back").addEventListener("click", goToMenu);
   $("settings-back").addEventListener("click", goToMenu);
 
+  // Reset account: wipes every save (money, skins, achievements, stats).
+  // Two confirmations so a stray click can never nuke the account.
+  const resetBtn = $("btn-reset-account");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      if (!confirm("Reset your account? This wipes all money, skins, achievements and progress. This cannot be undone.")) return;
+      if (!confirm("Are you absolutely sure? There is no way to restore your data.")) return;
+      SAVE.reset();
+      UI.applySettings(SAVE.load().settings);
+      UI.applyTheme();
+      UI.updateMenuStats();
+      UI.setTip();
+      goToMenu();
+      UI.notify("Account reset", null);
+    });
+  }
+
   // Settings toggles (shake / special effects) + the sound volume slider
   ["shake", "fx"].forEach(function (key) {
     const el = $("set-" + key);

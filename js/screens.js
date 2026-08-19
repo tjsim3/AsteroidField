@@ -152,7 +152,12 @@ window.UI = (function () {
       ["Health Restores", num(pk.health)],
       ["Slow-Mo Drops Found", num(pk.slow)],
       ["Shrink Drops Found", num(pk.shrink)],
-      ["Screen Clears Found", num(pk.clear)]
+      ["Screen Clears Found", num(pk.clear)],
+      ["Laser Drops Found", num(pk.laser)],
+      ["Shotgun Drops Found", num(pk.shotgun)],
+      ["Rocket Drops Found", num(pk.rockets)],
+      ["Rapid Fire Drops Found", num(pk.rapidfire)],
+      ["Shock Drops Found", num(pk.shock)]
     ];
     let html = '<div class="stats-head">Lifetime Stats</div><div class="stats-grid">';
     rows.forEach(function (r) {
