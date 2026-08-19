@@ -151,6 +151,7 @@ window.UI = (function () {
       ["Dollar Bills Collected", num(pk.money)],
       ["Reload Packs Found", num(pk.reload)],
       ["Health Restores", num(pk.health)],
+      ["Shields Found", num(pk.shield)],
       ["Slow-Mo Drops Found", num(pk.slow)],
       ["Shrink Drops Found", num(pk.shrink)],
       ["Screen Clears Found", num(pk.clear)],
@@ -301,7 +302,95 @@ window.UI = (function () {
       grid.appendChild(card);
     });
 
+    buildUpgrades(s);
     buildCollection(s);
+  }
+
+  /* Permanent-upgrade cards: buy one level of each with earned money. Each
+     card shows the current effect, the next level's effect, and the price. */
+  function buildUpgrades(s) {
+    const box = $("store-upgrades");
+    if (!box) return;
+    box.innerHTML = "";
+    DATA.UPGRADE_ORDER.forEach(function (id) {
+      const u = DATA.UPGRADES[id];
+      const lv = s.upgrades[id] || 0;
+      const now = u.value(lv);
+      const storageCap = DATA.UPGRADES.storage.value(s.upgrades.storage || 0);
+      const maxed = u.max != null ? lv >= u.max : now >= storageCap;
+      const price = DATA.upgradePrice(id, lv);
+      const canAfford = freeDrops || s.money >= price;
+
+      let desc, nextLine;
+      if (id === "hearts") {
+        desc = "Start with " + now + " / 12 hearts.";
+        nextLine = "+1 heart";
+      } else if (id === "startAmmo") {
+        desc = "Start with " + now + " / " + storageCap + " bullets.";
+        nextLine = "+3 bullets";
+      } else if (id === "storage") {
+        desc = "Hold up to " + now + " / 39 bullets.";
+        nextLine = "+3 capacity";
+      } else {
+        desc = "A gun drop flies by every " + now + "s.";
+        nextLine = "-2 seconds";
+      }
+
+      const card = document.createElement("div");
+      card.className = "drop-card up-card up-" + id;
+
+      const pic = document.createElement("div");
+      pic.className = "drop-pic up-pic";
+      const img = document.createElement("img");
+      img.src = u.icon;
+      img.alt = u.name;
+      pic.appendChild(img);
+      card.appendChild(pic);
+
+      const h3 = document.createElement("h3");
+      h3.textContent = u.max != null ? u.name + " Lv." + lv + "/" + u.max : u.name;
+      card.appendChild(h3);
+
+      const p = document.createElement("p");
+      p.textContent = desc;
+      card.appendChild(p);
+
+      const priceEl = document.createElement("span");
+      priceEl.className = "price";
+      priceEl.textContent = maxed ? "MAX" : (freeDrops ? "FREE" : fmt(price));
+      card.appendChild(priceEl);
+
+      const toast = document.createElement("span");
+      toast.className = "price-toast";
+      toast.textContent = maxed ? "\u00a0" : "next: " + nextLine;
+      card.appendChild(toast);
+
+      const btn = document.createElement("button");
+      btn.className = "buy-btn";
+      btn.disabled = maxed || !canAfford;
+      btn.textContent = maxed ? "MAX" : "Buy Lv." + (lv + 1);
+      btn.addEventListener("click", function () { buyUpgrade(id, lv, price); });
+      card.appendChild(btn);
+
+      box.appendChild(card);
+    });
+  }
+
+  function buyUpgrade(id, lv, price) {
+    const s = save.load();
+    const u = DATA.UPGRADES[id];
+    if (u.max != null ? lv >= u.max : u.value(lv) >= DATA.UPGRADES.storage.value(s.upgrades.storage || 0)) return;
+    if (!freeDrops && s.money < price) return;
+
+    if (!freeDrops) {
+      s.money -= price;
+      s.stats.lifetimeSpent += price;
+    }
+    s.upgrades[id] = lv + 1;
+    save.save();
+    updateStoreMoney();
+    buildStore();
+    notify(u.name + " is now level " + (lv + 1) + "!", u.icon);
   }
 
   /* A preview of the base (default) item each drop category sells. */

@@ -60,14 +60,22 @@ window.DATA = (function () {
   }
 
   /* ---------- Boost trail skins ---------- */
-  const TRAIL_NAMES = ["Ember", "Ion", "Stardust", "BOOST", "Aurora"];
+  // The first one (Ion, blue) is the player's original boost: it's listed
+  // first, drops first, and new players start equipped with it.
+  const TRAILS = [
+    { file: "costume2.svg", name: "Ion" },
+    { file: "costume1.svg", name: "Ember" },
+    { file: "costume3.svg", name: "Stardust" },
+    { file: "costume4.svg", name: "BOOST" },
+    { file: "costume5.svg", name: "Aurora" }
+  ];
   const trails = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < TRAILS.length; i++) {
     trails.push({
       id: "trail-" + (i + 1),
-      file: "costume" + (i + 1) + ".svg",
-      src: "PlayerTrailSkins/costume" + (i + 1) + ".svg",
-      name: TRAIL_NAMES[i]
+      file: TRAILS[i].file,
+      src: "PlayerTrailSkins/" + TRAILS[i].file,
+      name: TRAILS[i].name
     });
   }
 
@@ -144,6 +152,7 @@ window.DATA = (function () {
     { id: "slow", name: "Slow Drop", desc: "Slow-motion! All asteroids move at half speed for 6 seconds.", icon: "AsteroidsAndPowerups/SlowDown.svg", weight: 1 },
     { id: "shrink", name: "Shrink Drop", desc: "Shrink your ship so you are harder to hit, for 6 seconds.", icon: "AsteroidsAndPowerups/Shrink.svg", weight: 1 },
     { id: "clear", name: "Screen Clear", desc: "A mighty blast destroys every asteroid on screen. Ka-boom!", icon: "AsteroidsAndPowerups/ClearScreen2.svg", weight: 1 },
+    { id: "shield", name: "Shield", desc: "One temporary shield with 2 HP that absorbs hits.", icon: "AsteroidsAndPowerups/Shield.svg", weight: 0.25 },
     // gun powerups - they override your shots for a while (dur = seconds)
     { id: "laser", name: "Laser", desc: "Your shots become a blazing energy beam for 30 seconds.", icon: "AsteroidsAndPowerups/Laser.svg", weight: 1, dur: 30 },
     { id: "shotgun", name: "Shotgun", desc: "Blast 9 pellets in a spread for 30 seconds.", icon: "AsteroidsAndPowerups/Shotgun.svg", weight: 1, dur: 30 },
@@ -225,7 +234,7 @@ window.DATA = (function () {
     "Use your second of recovery to get out of the way.",
     "Grab every dollar bill you can - it banks to real cash.",
     "Power-ups usually show up in groups - look for a second.",
-    "A gun drop (laser, shotgun, rockets, rapid fire, shock) flies by every minute - grab it to swap your shots and reload +5 bullets.",
+    "A gun drop (laser, shotgun, rockets, rapid fire, shock) flies by roughly every minute - grab it to swap your shots and reload +5 bullets.",
     "You can squeeze through small gaps if you keep moving."
   ];
 
@@ -274,5 +283,50 @@ window.DATA = (function () {
     return d.base + d.inc * (count || 0);
   }
 
-  return { GAME, ships, bullets, trails, backgrounds, powerups, achievements, tips, hud, dropIcons, SPREAD, dropPrice, DROPS, DROP_ORDER };
+  /* ---------- Permanent Shop upgrades ---------- */
+  // Each upgrade is bought one level at a time with money earned in-game.
+  // `value(lv)` returns the effective stat at that purchased level. The
+  // gameplay code reads these (via DATA) so the effect is always current.
+  const UPGRADES = {
+    hearts: {
+      name: "Extra Hearts",
+      icon: "AsteroidsAndPowerups/EntityEffects/GainedHealth.svg",
+      max: 6,                    // base 6 hearts -> cap 12 total
+      base: 2000, inc: 2000,
+      desc: "Permanently +1 heart each level. Caps at 12 hearts.",
+      value: function (lv) { return Math.min(12, GAME.maxHealth + lv); }
+    },
+    startAmmo: {
+      name: "Start With More Bullets",
+      icon: "AsteroidsAndPowerups/Reload.svg",
+      max: null,                 // bounded by your bullet storage instead
+      base: 1200, inc: 1200,
+      desc: "Start every run with +3 bullets. Never more than your bullet storage.",
+      value: function (lv) { return GAME.startAmmo + lv * 3; }
+    },
+    storage: {
+      name: "More Bullet Storage",
+      icon: "BulletSkins/costume1.svg",
+      max: 5,                    // base 24 bullets -> cap 39
+      base: 1600, inc: 1600,
+      desc: "Permanently +3 bullet capacity each level. Caps at 39 bullets.",
+      value: function (lv) { return Math.min(39, GAME.maxAmmo + lv * 3); }
+    },
+    gunDrop: {
+      name: "Gun Drop Frequency",
+      icon: "AsteroidsAndPowerups/RapidFire.svg",
+      max: 5,                    // base 60s -> floor 50s
+      base: 1500, inc: 1500,
+      desc: "Gun powerups drift by 2 seconds sooner each level. Minimum 50 seconds.",
+      value: function (lv) { return Math.max(50, 60 - lv * 2); }
+    }
+  };
+  const UPGRADE_ORDER = ["hearts", "startAmmo", "storage", "gunDrop"];
+
+  function upgradePrice(id, level) {
+    const u = UPGRADES[id];
+    return u.base + u.inc * (level || 0);
+  }
+
+  return { GAME, ships, bullets, trails, backgrounds, powerups, achievements, tips, hud, dropIcons, SPREAD, dropPrice, DROPS, DROP_ORDER, UPGRADES, UPGRADE_ORDER, upgradePrice };
 })();

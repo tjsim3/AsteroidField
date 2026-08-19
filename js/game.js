@@ -10,6 +10,25 @@ window.Game = (function () {
 
   const G = DATA.GAME;
 
+  // ---------- permanent shop upgrades (effective values this run) ----------
+  let eff = {
+    maxHealth: G.maxHealth,
+    startAmmo: G.startAmmo,
+    maxAmmo: G.maxAmmo,
+    gunDropInterval: 60
+  };
+
+  /* Re-read the save's purchased upgrades into `eff`. Called at the top of
+     every startRun so a mid-session purchase applies from the next run on. */
+  function refreshUpgrades() {
+    const u = SAVE.load().upgrades || {};
+    const maxAmmo = DATA.UPGRADES.storage.value(u.storage || 0);
+    eff.maxHealth = DATA.UPGRADES.hearts.value(u.hearts || 0);
+    eff.startAmmo = Math.min(maxAmmo, DATA.UPGRADES.startAmmo.value(u.startAmmo || 0));
+    eff.maxAmmo = maxAmmo;
+    eff.gunDropInterval = DATA.UPGRADES.gunDrop.value(u.gunDrop || 0);
+  }
+
   // ---------- canvas ----------
   let canvas, ctx;
   let W = 0, H = 0;
@@ -36,7 +55,7 @@ window.Game = (function () {
     scoreSurvival: 0,
     scoreAsteroids: 0,
     pickups: {
-      money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0,
+      money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0, shield: 0,
       laser: 0, shotgun: 0, rockets: 0, rapidfire: 0, shock: 0
     }
   };
@@ -181,6 +200,7 @@ window.Game = (function () {
     lastOpts = opts || {};
     twoPlayer = !!opts.two;
     const save = SAVE.load();
+    refreshUpgrades();
 
     // skin config picked on the 2P setup screen (falls back to equipped gear)
     const cfg = opts.cfg || {};
@@ -198,9 +218,10 @@ window.Game = (function () {
         x: Math.max(130, W * 0.16),
         y: y,
         r: 20,
-        maxHealth: G.maxHealth,
-        health: G.maxHealth,
-        ammo: G.startAmmo,
+        maxHealth: eff.maxHealth,
+        health: eff.maxHealth,
+        shield: 0,          // temporary shield HP (0 none, 2 full, 1 cracked)
+        ammo: eff.startAmmo,
         pitch: 0,          // eased ship rotation in degrees (nose up = negative)
         wobble: 0,         // extra chaotic rotation after a hit
         wobbleT: 0,        // seconds of wobble left
@@ -283,7 +304,7 @@ window.Game = (function () {
     powerupCd = 2.5;
     healCd = 30;
     healsDone = 0;
-    gunCd = 60;
+    gunCd = eff.gunDropInterval;
 
     state = STATE.PLAYING;
     document.getElementById("gameover-overlay").classList.add("hidden");
@@ -512,7 +533,7 @@ window.Game = (function () {
     // ---- gun drops: one random weapon pickup flies by every 60s ----
     gunCd -= dt;
     if (gunCd <= 0) {
-      gunCd = 60;
+      gunCd = eff.gunDropInterval;
       spawnGunPickup();
     }
 
@@ -572,7 +593,7 @@ window.Game = (function () {
         if (a.y + a.r > H) { a.y = H - a.r; a.vy = -Math.abs(a.vy); }
       }
 
-      if (a.x < -a.r - 10) {
+      if (a.x < -a.r - 10 || a.x > W + a.r + 10) {
         asteroids.splice(i, 1);
         continue;
       }
@@ -688,7 +709,8 @@ window.Game = (function () {
    Runs asynchronously: a chain ticks one hop per frame. */
 const SHOCK_RANGE = 140;
 const SHOCK_PAUSE = 0;       // no buffer: hop every frame, so children are caught ASAP
-const SHOCK_MAX_HITS = 24;   // safety cap so a dense screen can't drag forever
+const SHOCK_MAX_HITS = 60;   // safety cap: high enough that a chain always reaches
+                             // the children of every rock it smashes
 
 function startShockChain(x, y) {
   shockChains.push({
@@ -973,24 +995,41 @@ function finishShockChain(ch, i) {
       const childKey = a.size.key === "big" ? "med" : (a.size.key === "med" ? "small" : null);
       if (childKey) {
         const child = ASTEROID_SIZES.find(function (s) { return s.key === childKey; });
-        // Fixed spawn instead of randomness: both children sit 1/3 of the
-        // width in from the parent's leftmost edge and 1/6 of the height
-        // above/below the parent's center. A bullet that hits the top-front
-        // or bottom-front of the rock also plows through the matching child.
-        const cx = a.x - a.r / 3;
+        // Children stack at the rock's center on the x-axis, split 1/6 of the
+        // height above/below the parent's center, and fling out at half speed
+        // so the split reads as a gentle crack instead of a violent burst.
+        // A point-blank shoot-out must not blow up in the shooter's face, so
+        // fresh fragments are spawned clear of the ships - and if a ship is
+        // right on top of the split, the fragments dart AWAY from it.
+        let sx = a.x;
+        for (let pi = 0; pi < players.length; pi++) {
+          const pl = players[pi];
+          if (pl.health <= 0) continue;
+          const need = pl.x + playerRadius(pl) + child.r + 8;
+          if (sx < need) sx = need;
+        }
+        // default: fragments drift with the asteroid flow (leftward). Near a
+        // ship they reverse out, so a point-blank kill can't sandbag you.
+        let vxDir = -1;
+        for (let pi = 0; pi < players.length; pi++) {
+          const pl = players[pi];
+          if (pl.health <= 0) continue;
+          if (Math.abs(sx - pl.x) < 160) {
+            vxDir = sx >= pl.x ? 1 : -1;   // away from the ship along x
+            break;
+          }
+        }
         for (const side of [-1, 1]) {
-          // Blend of the old random scatter and the fixed stack: children stay
-          // roughly 1/3 of the width in from the left edge and stacked
-          // top/bottom, with a little wobble so repeated splits don't look
-          // identical. The boost keeps the fragments flinging apart quickly.
+          // Half-speed fragments: a little wobble so repeated splits don't
+          // look identical, but they stay near the parent for easier cleanup.
           const wob = (Math.random() - 0.5) * child.r * 0.6;
-          const vy = side * (70 + child.speed * (0.5 + Math.random() * 0.3));
+          const vy = side * (35 + child.speed * (0.25 + Math.random() * 0.15));
           asteroids.push({
-            x: cx + wob,
+            x: sx + wob,
             y: a.y + side * (a.r / 3) + wob,
             r: child.r,
             size: child,
-            vx: -child.speed * (0.8 + Math.random() * 0.4) * G.asteroidSpeedMul,
+            vx: vxDir * child.speed * (0.4 + Math.random() * 0.2) * G.asteroidSpeedMul,
             vy: vy,
             rot: Math.random() * 6,
             rotSpeed: (Math.random() - 0.5) * 3
@@ -1022,6 +1061,20 @@ function finishShockChain(ch, i) {
     const a = asteroids[ai];
     asteroids.splice(ai, 1);
 
+    if (p.shield > 0) {
+      // the shield eats the hit: full bubble (2 HP) -> cracked bubble (1 HP)
+      p.shield--;
+      FX.ring(p.x, p.y, 60, 20, 0.5, "#5cd8ff", "rgba(92,216,255,0.3)");
+      FX.addShake(7);
+      FX.floatText(p.x, p.y - 30, p.shield > 0 ? "SHIELD" : "SHIELD DOWN", "#5cd8ff", 18);
+      SFX.zap();
+      const dir = Math.abs(a.vy) > 20 ? (a.vy > 0 ? 1 : -1) : (Math.random() < 0.5 ? -1 : 1);
+      p.knockVy = dir * 240;
+      p.knockT = 0.3;
+      p.wobbleT = 0.4;
+      return;
+    }
+
     p.health--;
     p.damageTaken++;
     p.invulnT = 1.3;
@@ -1051,6 +1104,7 @@ function finishShockChain(ch, i) {
     slow: { color: "#b06bff", msg: "Slow-Mo!" },
     shrink: { color: "#ffe93a", msg: "Shrunk!" },
     clear: { color: "#ff9300", msg: "SCREEN CLEAR!" },
+    shield: { color: "#5cd8ff", msg: "SHIELD UP!" },
     health: { color: "#ff5c6c", msg: "+1 Life" },
     laser: { color: "#6ff0ff", msg: "LASER!" },
     shotgun: { color: "#ffa94d", msg: "SHOTGUN!" },
@@ -1086,8 +1140,13 @@ function finishShockChain(ch, i) {
   /* One gun pickup every 60 seconds, picking a random weapon each time
    (laser, shotgun, rockets, rapid fire or shock - all equally likely). */
   const GUN_ORDER = ["laser", "shotgun", "rockets", "rapidfire", "shock"];
+  let lastGunPickup = null;   // the last gun that drifted by (never spawn it twice in a row)
   function spawnGunPickup() {
-    const id = GUN_ORDER[(Math.random() * GUN_ORDER.length) | 0];
+    let id;
+    do {
+      id = GUN_ORDER[(Math.random() * GUN_ORDER.length) | 0];
+    } while (id === lastGunPickup && GUN_ORDER.length > 1);
+    lastGunPickup = id;
     powerups.push({
       id: id,
       icon: DATA.dropIcons[id],
@@ -1109,7 +1168,7 @@ function finishShockChain(ch, i) {
     pl.energy = 100;
     pl.laserOn = false;
     pl.laserCd = 0;
-    pl.ammo = Math.min(G.maxAmmo, pl.ammo + 5);
+    pl.ammo = Math.min(eff.maxAmmo, pl.ammo + 5);
     const f = PFX[id] || { color: "#ffffff", msg: "" };
     FX.pickupFx(pl.x, pl.y, f.color);
     FX.floatText(pl.x, pl.y - 40, f.msg, f.color, 18);
@@ -1117,18 +1176,17 @@ function finishShockChain(ch, i) {
   }
 
   function spawnPowerup() {
-    // Money's spawn weight was cut to a third of what it used to be:
-    // it now keeps a steady weight of 1 (about 1-in-8 drops at any
-    // point in the run) instead of dominating the early game.
+    // Pool is built x4 so fractional drop weights stay exact: shield (0.25)
+    // lands ~1/4 as often as shrink (1), while every existing ratio holds.
+    const SCALE = 4;
     const t = Math.min(1, runTime / 90);
     const moneyW = Math.max(1, Math.round((4 - t * 3) / 3));
     const pool = [];
-    for (let k = 0; k < moneyW; k++) pool.push("money");
+    for (let k = 0; k < moneyW * SCALE; k++) pool.push("money");
     DATA.powerups.forEach(function (p) {
       // guns show up on their own 60-second timer, not in the random pool
       if (p.dur) return;
-      // weight controls how often a drop spawns (reload shows up more)
-      const w = p.weight || 1;
+      const w = Math.round((p.weight || 1) * SCALE);
       for (let k = 0; k < w; k++) pool.push(p.id);
     });
 
@@ -1164,7 +1222,7 @@ function finishShockChain(ch, i) {
       FX.floatText(pwr.x, pwr.y - 16, "+$" + gain, "#ffe93a", 19);
       SFX.coin();
     } else if (pwr.id === "reload") {
-      pl.ammo = Math.min(G.maxAmmo, pl.ammo + 3);
+      pl.ammo = Math.min(eff.maxAmmo, pl.ammo + 3);
       runStats.pickups.reload++;
       FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 17);
       SFX.power();
@@ -1205,6 +1263,17 @@ function finishShockChain(ch, i) {
       FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 22);
       FX.addShake(10);
       SFX.bigBoom();
+    } else if (pwr.id === "shield") {
+      if (!(pl.shield > 0)) {
+        pl.shield = 2;   // one shield, 2 HP, never stacks
+        runStats.pickups.shield++;
+        FX.ring(p.x, p.y, 70, 24, 0.6, "#5cd8ff", "rgba(92,216,255,0.25)");
+        FX.floatText(pwr.x, pwr.y - 16, f.msg, f.color, 18);
+        SFX.power();
+      } else {
+        FX.floatText(pwr.x, pwr.y - 16, "Already Shielded", "#5cd8ff", 15);
+        SFX.click();
+      }
     } else if (pwr.id === "laser" || pwr.id === "shotgun" || pwr.id === "rockets" ||
                pwr.id === "rapidfire" || pwr.id === "shock") {
       // gun powerup: swap this player's shots for a while (+5 bullets)
@@ -1316,6 +1385,7 @@ function finishShockChain(ch, i) {
         '<div><span>Dollar Bills</span><span>' + st.pickups.money + '</span></div>' +
         '<div><span>Reload Packs</span><span>' + st.pickups.reload + '</span></div>' +
         '<div><span>Health Restores</span><span>' + st.pickups.health + '</span></div>' +
+        '<div><span>Shields</span><span>' + (st.pickups.shield || 0) + '</span></div>' +
         '<div><span>Slow-Mo</span><span>' + st.pickups.slow + '</span></div>' +
         '<div><span>Shrink</span><span>' + st.pickups.shrink + '</span></div>' +
         '<div><span>Laser</span><span>' + (st.pickups.laser || 0) + '</span></div>' +
@@ -1544,6 +1614,40 @@ function finishShockChain(ch, i) {
         ctx.lineWidth = 2;
         ctx.stroke();
       }
+
+      // shield bubble: a bright pulsing dome around the ship. Cyan at full
+      // (2 HP), orange with a cross seam once it's been cracked (1 HP).
+      if (!dead && p.shield > 0) {
+        const sCol = p.shield >= 2 ? "#5cd8ff" : "#ff9a5c";
+        const pulse = 0.5 + 0.5 * Math.sin(runTime * 6 + p.name.charCodeAt(0));
+        const rad = playerRadius(p) + 15;
+        ctx.save();
+        ctx.globalAlpha = 0.14 + 0.08 * pulse;
+        ctx.fillStyle = sCol;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 0.5 + 0.25 * pulse;
+        ctx.strokeStyle = sCol;
+        ctx.shadowColor = sCol;
+        ctx.shadowBlur = 18;
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
+        ctx.stroke();
+        if (p.shield <= 1) {
+          ctx.globalAlpha = 0.9;
+          ctx.strokeStyle = "#ffc9a3";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(p.x - rad, p.y);
+          ctx.lineTo(p.x + rad, p.y);
+          ctx.moveTo(p.x, p.y - rad);
+          ctx.lineTo(p.x, p.y + rad);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
     });
 
     // ---- effects on top ----
@@ -1668,7 +1772,7 @@ function finishShockChain(ch, i) {
 
     // Rebuild the roster block only when a health / ammo value actually changed.
     const rosterKey = players.map(function (p) {
-      return p.name + "|" + p.health + "|" + p.maxHealth + "|" + p.ammo;
+      return p.name + "|" + p.health + "|" + p.maxHealth + "|" + p.ammo + "|" + eff.maxAmmo;
     }).join(";;");
     if (playersHost._key !== rosterKey) {
       playersHost._key = rosterKey;
@@ -1682,7 +1786,7 @@ function finishShockChain(ch, i) {
           hearts += i < p.health ? '<span class="on">\u2665</span>' : '<span class="off">\u2665</span>';
         }
         let ammo = "";
-        for (let i = 0; i < G.maxAmmo; i++) {
+        for (let i = 0; i < eff.maxAmmo; i++) {
           const dim = dead || i >= p.ammo;
           ammo += '<img class="ammo-dot' + (dim ? " dim" : "") + '" src="' + DATA.hud.bulletDot + '">';
         }
@@ -1709,6 +1813,7 @@ function finishShockChain(ch, i) {
       if (p.health <= 0) bits.push("OUT");
       if (p.gun) bits.push(GUN_LABELS[p.gun] + " " + Math.ceil(p.gunT) + "s");
       if (p.invulnT > 0) bits.push("INVULNERABLE");
+      if (p.shield > 0) bits.push("SHIELD " + p.shield);
       if (shrinkT > 0) bits.push("SHRUNK " + shrinkT.toFixed(1) + "s");
       if (slowT > 0) bits.push("SLOW " + slowT.toFixed(1) + "s");
       chip.textContent = bits.join("  |  ");

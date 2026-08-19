@@ -10,18 +10,19 @@ window.SAVE = (function () {
   /* A fresh save: the player starts with $0 and the basic skins. */
   function defaultSave() {
     return {
+      version: 2,            // saved-data schema; bumped when skins swap slots
       money: 0,
       equipment: {
         ship: "ship-0",
         bullet: "bullet-1",
         background: "space",
-        boost: "trail-2"
+        boost: "trail-1"
       },
       // Owned customization ids, one list per category. Found via Shop drops.
       owned: {
         ship: ["ship-0"],
         bullet: ["bullet-1"],
-        boost: ["trail-2"],
+        boost: ["trail-1"],
         background: ["space"]
       },
       stats: {
@@ -43,9 +44,16 @@ window.SAVE = (function () {
         bestCombo: 0,            // highest combo a single bullet ever reached
         comboTotal: 0,           // total combo value accumulated (each finished combo adds its size)
         pickups: {               // lifetime pickups found
-          money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0,
+          money: 0, reload: 0, health: 0, slow: 0, shrink: 0, clear: 0, shield: 0,
           laser: 0, shotgun: 0, rockets: 0, rapidfire: 0, shock: 0
         }
+      },
+      // Permanent shop upgrades (each bought once per level).
+      upgrades: {
+        hearts: 0,     // +1 max heart per level (cap 12 total)
+        startAmmo: 0,  // +3 starting bullets per level (capped by storage)
+        storage: 0,    // +3 max bullet storage per level (cap 39)
+        gunDrop: 0     // gun powerups arrive 2s sooner per level (min 50s)
       },
       achievements: {},          // { id: true } when unlocked
       settings: {
@@ -64,6 +72,13 @@ window.SAVE = (function () {
       const raw = localStorage.getItem(KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
+        // v1 -> v2: the first two boost trails swapped slots (the blue "Ion"
+        // moved from trail-2 to trail-1). Rebake legacy references so every
+        // stored gear choice keeps pointing at the same trail art.
+        if (!parsed.version) {
+          swapTrailNumbers(parsed);
+          parsed.version = 2;
+        }
         // Merge over the defaults so new fields never break old saves.
         const base = defaultSave();
         current = mergeDeep(base, parsed);
@@ -92,6 +107,21 @@ window.SAVE = (function () {
         const def = DATA.achievements.find(function (a) { return a.id === id; });
         if (!def) delete s.achievements[id];
       });
+    }
+  }
+
+  /* v1 saves stored the original blue boost as trail-2; in v2 it's trail-1.
+     Flip any "trail-1"/"trail-2" references so a stored gear choice keeps
+     pointing at the same art instead of silently changing trails. */
+  function swapTrailNumbers(s) {
+    const flip = function (id) {
+      if (id === "trail-1") return "trail-2";
+      if (id === "trail-2") return "trail-1";
+      return id;
+    };
+    if (s.equipment && s.equipment.boost) s.equipment.boost = flip(s.equipment.boost);
+    if (s.owned && Array.isArray(s.owned.boost)) {
+      s.owned.boost = s.owned.boost.map(function (id) { return flip(id); });
     }
   }
 

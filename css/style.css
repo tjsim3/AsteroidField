@@ -413,6 +413,7 @@ button:focus-visible {
 /* Bullet counter: little bullet images */
 .ammo {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 3px;
   align-items: center;
   min-height: 26px;
@@ -990,6 +991,52 @@ button:focus-visible {
   transform: none;
 }
 
+/* Permanent-upgrade section on the store screen */
+.upgrade-section {
+  width: 100%;
+}
+
+.upgrades-head {
+  text-align: center;
+  color: #dcc576;
+  letter-spacing: 0.14em;
+  font-size: 14px;
+  font-weight: 800;
+  margin: 10px 0 12px;
+}
+
+.store-upgrades {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 12px;
+  padding: 4px 0 18px;
+}
+
+.up-card {
+  flex: 1 1 210px;
+  max-width: 230px;
+}
+
+.up-card h3 { font-size: 15px; }
+.up-card .price { font-size: 22px; }
+
+.up-pic {
+  width: 76px;
+  height: 64px;
+}
+
+/* Per-upgrade accent colors */
+.up-card.up-hearts     { border-color: rgba(226, 108, 108, 0.45); }
+.up-card.up-hearts h3  { color: #ff9d9d; }
+.up-card.up-startAmmo  { border-color: rgba(116, 196, 138, 0.45); }
+.up-card.up-startAmmo h3 { color: #9fe8b0; }
+.up-card.up-storage    { border-color: rgba(124, 170, 232, 0.45); }
+.up-card.up-storage h3 { color: #9fc4f5; }
+.up-card.up-gunDrop    { border-color: rgba(214, 152, 227, 0.45); }
+.up-card.up-gunDrop h3 { color: #e3b4f0; }
+
 /* Installed collection */
 .store-collection {
   border-top: 1px solid var(--border);
@@ -1352,7 +1399,7 @@ button:focus-visible {
 }
 
 .setting-value {
-  min-width: 34px;
+  width: 50px;
   text-align: center;
   font-size: 15px;
   font-weight: 800;
