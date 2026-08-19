@@ -770,8 +770,6 @@ window.Game = (function () {
   function fireLaser(p) { fireBullet(p); }
 
   /* Shotgun: five pellets, 30/15/0/-15/-30 degrees. Each pellet acts like
-
-  /* Shotgun: five pellets, 30/15/0/-15/-30 degrees. Each pellet acts like
      a normal falling bullet (combo and all). */
   function fireShotgun(p) {
     bullets.push({
