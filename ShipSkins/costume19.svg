@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ======================================================
+  CONCEPT 35: EKG MONITOR
+  A heartbeat trace runs across the hull - a bright dot
+  travels the line and the spike flares as it passes.
+  Clipped to hull. Shape = Scout (0.svg).
+  ====================================================== -->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg"
+     width="43.50001" height="30.22535" viewBox="0,0,43.50001,30.22535">
+  <style>.hull { fill:#0a1a14; } .shade { fill:#07120e; } .glass { fill:#c8ffe8; } .nozzle { fill:#3b4069; }</style>
+  <defs>
+    <clipPath id="shipClip">
+      <path d="M240.40845,184.18663l-8.27113,10.51761h-3.67606v-11.43662h-2.75704l-4.7993,4.7993h-2.65493v-16.89965h2.39965l4.85035,4.85035h3.16549v-10.82395l2.96127,-0.10211l8.88381,10.41549l21.23944,4.28873z"/>
+    </clipPath>
+    <path id="ekg" d="M222,180 L230,180 L233,177 L236,183 L238,172 L240,188 L242,178 L244,180 L256,180" fill="none"/>
+  </defs>
+  <g transform="translate(-218.24999,-164.88734)" fill-rule="nonzero" stroke="none" stroke-width="0">
+    <path class="hull" d="M240.40845,184.18663l-8.27113,10.51761h-3.67606v-11.43662h-2.75704l-4.7993,4.7993h-2.65493v-16.89965h2.39965l4.85035,4.85035h3.16549v-10.82395l2.96127,-0.10211l8.88381,10.41549l21.23944,4.28873z"/>
+    <path class="shade" d="M239.6033,183.53019l-7.47508,8.90777h-3.52648v-9.27767l-3.00226,0.10211l-3.62261,3.55415h-2.39941v-14.31297h2.1687l3.77086,3.6995h3.26929v-8.75877l2.88049,-0.08648l8.02879,8.82129l19.19527,3.63229z"/>
+
+    <g clip-path="url(#shipClip)">
+      <!-- faint grid -->
+      <g stroke="#123a2a" stroke-width="0.3">
+        <line x1="222" y1="170" x2="222" y2="190"/><line x1="228" y1="170" x2="228" y2="190"/>
+        <line x1="234" y1="170" x2="234" y2="190"/><line x1="240" y1="170" x2="240" y2="190"/>
+        <line x1="246" y1="170" x2="246" y2="190"/><line x1="252" y1="170" x2="252" y2="190"/>
+        <line x1="220" y1="174" x2="258" y2="174"/><line x1="220" y1="186" x2="258" y2="186"/>
+      </g>
+      <!-- dim full trace -->
+      <use href="#ekg" stroke="#1f5a40" stroke-width="0.7"/>
+      <!-- bright drawing head: dash sweeps along the path -->
+      <use href="#ekg" stroke="#4affaf" stroke-width="1" stroke-linejoin="round"
+           stroke-dasharray="12 60" stroke-dashoffset="72">
+        <animate attributeName="stroke-dashoffset" from="72" to="-60" dur="2.4s" repeatCount="indefinite"/>
+      </use>
+      <!-- traveling dot rides the same path -->
+      <circle r="1" fill="#c8ffe0">
+        <animateMotion dur="2.4s" repeatCount="indefinite"
+                       path="M222,180 L230,180 L233,177 L236,183 L238,172 L240,188 L242,178 L244,180 L256,180"/>
+      </circle>
+      <!-- spike flare synced to when the dot crosses the big spike -->
+      <circle cx="239" cy="180" r="3" fill="#4affaf" opacity="0">
+        <animate attributeName="opacity" values="0;0;0.35;0;0" keyTimes="0;0.42;0.5;0.58;1" dur="2.4s" repeatCount="indefinite"/>
+      </circle>
+      <!-- BPM readout blip -->
+      <rect x="223" y="171" width="5" height="2.4" rx="0.6" fill="#123a2a"/>
+      <circle cx="224.6" cy="172.2" r="0.55" fill="#ff5a5a">
+        <animate attributeName="opacity" values="1;0.2;1" dur="1.2s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+
+    <path class="glass" d="M243.11444,179.81017c0,-1.11996 2.14872,-2.02787 4.7993,-2.02787c2.65058,0 4.7993,0.90791 4.7993,2.02787c0,1.11996 -2.14872,2.02787 -4.7993,2.02787c-2.65058,0 -4.7993,-0.90791 -4.7993,-2.02787z"/>
+    <g class="nozzle">
+      <path d="M231.98415,195.11269c-1.91744,0 -3.47183,-0.22859 -3.47183,-0.51056c0,-0.28198 1.55439,-0.51056 3.47183,-0.51056c1.91744,0 3.47183,0.22859 3.47183,0.51056c0,0.28198 -1.55439,0.51056 -3.47183,0.51056z"/>
+      <path d="M232.08627,165.90846c-1.91744,0 -3.47183,-0.22859 -3.47183,-0.51056c0,-0.28198 1.55439,-0.51056 3.47183,-0.51056c1.91744,0 3.47183,0.22859 3.47183,0.51056c0,0.28198 -1.55439,0.51056 -3.47183,0.51056z"/>
+      <path d="M235.45599,191.02818c-1.91744,0 -3.47183,-0.22859 -3.47183,-0.51056c0,-0.28198 1.55439,-0.51056 3.47183,-0.51056c1.91744,0 3.47183,0.22859 3.47183,0.51056c0,0.28198 -1.55439,0.51056 -3.47183,0.51056z"/>
+      <path d="M235.25176,170.40142c-1.91744,0 -3.47183,-0.22859 -3.47183,-0.51056c0,-0.28198 1.55439,-0.51056 3.47183,-0.51056c1.91744,0 3.47183,0.22859 3.47183,0.51056c0,0.28198 -1.55439,0.51056 -3.47183,0.51056z"/>
+    </g>
+  </g>
+</svg>

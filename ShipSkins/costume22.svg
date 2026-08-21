@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ======================================================
+  CONCEPT 36: PORTAL SWIRL
+  A swirling portal spins inside the hull - two arms of
+  orbiting light counter-rotate around a glowing core.
+  Clipped to hull. Shape = Scout (0.svg).
+  ====================================================== -->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg"
+     width="43.50001" height="30.22535" viewBox="0,0,43.50001,30.22535">
+  <style>.hull { fill:#141032; } .shade { fill:#0d0a22; } .glass { fill:#e4e7ff; } .nozzle { fill:#3b4069; }</style>
+  <defs>
+    <clipPath id="shipClip">
+      <path d="M240.40845,184.18663l-8.27113,10.51761h-3.67606v-11.43662h-2.75704l-4.7993,4.7993h-2.65493v-16.89965h2.39965l4.85035,4.85035h3.16549v-10.82395l2.96127,-0.10211l8.88381,10.41549l21.23944,4.28873z"/>
+    </clipPath>
+  </defs>
+  <g transform="translate(-218.24999,-164.88734)" fill-rule="nonzero" stroke="none" stroke-width="0">
+    <path class="hull" d="M240.40845,184.18663l-8.27113,10.51761h-3.67606v-11.43662h-2.75704l-4.7993,4.7993h-2.65493v-16.89965h2.39965l4.85035,4.85035h3.16549v-10.82395l2.96127,-0.10211l8.88381,10.41549l21.23944,4.28873z"/>
+    <path class="shade" d="M239.6033,183.53019l-7.47508,8.90777h-3.52648v-9.27767l-3.00226,0.10211l-3.62261,3.55415h-2.39941v-14.31297h2.1687l3.77086,3.6995h3.26929v-8.75877l2.88049,-0.08648l8.02879,8.82129l19.19527,3.63229z"/>
+
+    <g clip-path="url(#shipClip)">
+      <!-- portal backdrop -->
+      <circle cx="240" cy="180" r="12" fill="#241a5a" opacity="0.85"/>
+
+      <!-- outer arm ring, clockwise -->
+      <g fill="none" stroke-linecap="round">
+        <animateTransform attributeName="transform" type="rotate" from="0 240 180" to="360 240 180" dur="4s" repeatCount="indefinite"/>
+        <path d="M240,170 Q250,174 248,183 Q246,190 238,189" stroke="#7a5aff" stroke-width="1.6" opacity="0.9"/>
+        <path d="M240,190 Q230,186 232,177 Q234,170 242,171" stroke="#7a5aff" stroke-width="1.6" opacity="0.9"/>
+        <path d="M251,178 Q252,186 244,190" stroke="#b08aff" stroke-width="1" opacity="0.6"/>
+        <path d="M229,182 Q228,174 236,170" stroke="#b08aff" stroke-width="1" opacity="0.6"/>
+      </g>
+
+      <!-- inner arm ring, counter-clockwise -->
+      <g fill="none" stroke-linecap="round">
+        <animateTransform attributeName="transform" type="rotate" from="360 240 180" to="0 240 180" dur="2.6s" repeatCount="indefinite"/>
+        <path d="M240,175 Q245,178 243,183 Q241,187 237,185" stroke="#4affdf" stroke-width="1.1" opacity="0.85"/>
+        <path d="M240,185 Q235,182 237,177 Q239,173 243,175" stroke="#4affdf" stroke-width="1.1" opacity="0.85"/>
+      </g>
+
+      <!-- core with pulse -->
+      <circle cx="240" cy="180" r="2.6" fill="#e0d0ff">
+        <animate attributeName="r" values="2.2;3.1;2.2" dur="1.4s" repeatCount="indefinite"/>
+      </circle>
+      <!-- orbiting spark -->
+      <g>
+        <animateTransform attributeName="transform" type="rotate" from="0 240 180" to="360 240 180" dur="1.8s" repeatCount="indefinite"/>
+        <circle cx="240" cy="172" r="0.8" fill="#ffffff"/>
+      </g>
+    </g>
+
+    <path class="glass" d="M243.11444,179.81017c0,-1.11996 2.14872,-2.02787 4.7993,-2.02787c2.65058,0 4.7993,0.90791 4.7993,2.02787c0,1.11996 -2.14872,2.02787 -4.7993,2.02787c-2.65058,0 -4.7993,-0.90791 -4.7993,-2.02787z"/>
+    <g class="nozzle">
+      <path d="M231.98415,195.11269c-1.91744,0 -3.47183,-0.22859 -3.47183,-0.51056c0,-0.28198 1.55439,-0.51056 3.47183,-0.51056c1.91744,0 3.47183,0.22859 3.47183,0.51056c0,0.28198 -1.55439,0.51056 -3.47183,0.51056z"/>
+      <path d="M232.08627,165.90846c-1.91744,0 -3.47183,-0.22859 -3.47183,-0.51056c0,-0.28198 1.55439,-0.51056 3.47183,-0.51056c1.91744,0 3.47183,0.22859 3.47183,0.51056c0,0.28198 -1.55439,0.51056 -3.47183,0.51056z"/>
+      <path d="M235.45599,191.02818c-1.91744,0 -3.47183,-0.22859 -3.47183,-0.51056c0,-0.28198 1.55439,-0.51056 3.47183,-0.51056c1.91744,0 3.47183,0.22859 3.47183,0.51056c0,0.28198 -1.55439,0.51056 -3.47183,0.51056z"/>
+      <path d="M235.25176,170.40142c-1.91744,0 -3.47183,-0.22859 -3.47183,-0.51056c0,-0.28198 1.55439,-0.51056 3.47183,-0.51056c1.91744,0 3.47183,0.22859 3.47183,0.51056c0,0.28198 -1.55439,0.51056 -3.47183,0.51056z"/>
+    </g>
+  </g>
+</svg>

@@ -34,6 +34,7 @@ window.ASSETS = (function () {
   function preloadAll(onProgress) {
     const srcs = [];
     DATA.ships.forEach(s => srcs.push(s.src));
+    (DATA.rewardShips || []).forEach(s => srcs.push(s.src));
     DATA.bullets.forEach(b => srcs.push(b.src));
     DATA.trails.forEach(t => srcs.push(t.src));
     Object.values(DATA.dropIcons).forEach(p => srcs.push(p));

@@ -44,6 +44,25 @@ window.DATA = (function () {
     name: SHIP_NAMES[i]
   }));
 
+  /* ---------- Level-reward ships ---------- */
+  // Earned on the XP track (never sold in shop drops). rewardLevel is the
+  // level whose claim unlocks the skin; XP.rewardFor pays $0 on those levels.
+  // fx names the canvas-side animator in game.js - drawImage() can't play
+  // SMIL animation on the game canvas, so each animated skin's moving parts
+  // are redrawn live from these tables.
+  const rewardShips = [
+    { id: "ship-neon",      file: "costume14.svg", src: "ShipSkins/costume14.svg", name: "Neon Trace",   rewardLevel: 10,  fx: "neon" },
+    { id: "ship-prism",     file: "costume15.svg", src: "ShipSkins/costume15.svg", name: "Prism",        rewardLevel: 20,  fx: "prism" },
+    { id: "ship-circuit",   file: "costume16.svg", src: "ShipSkins/costume16.svg", name: "Circuit Flow", rewardLevel: 30,  fx: "circuit" },
+    { id: "ship-helix",     file: "costume17.svg", src: "ShipSkins/costume17.svg", name: "DNA Helix",    rewardLevel: 40,  fx: "helix" },
+    { id: "ship-scanline",  file: "costume18.svg", src: "ShipSkins/costume18.svg", name: "Scanline",     rewardLevel: 50,  fx: "scan" },
+    { id: "ship-ekg",       file: "costume19.svg", src: "ShipSkins/costume19.svg", name: "EKG Monitor",  rewardLevel: 60,  fx: "ekg" },
+    { id: "ship-hexpulse",  file: "costume20.svg", src: "ShipSkins/costume20.svg", name: "Hex Pulse",    rewardLevel: 70,  fx: "hex" },
+    { id: "ship-magma",     file: "costume21.svg", src: "ShipSkins/costume21.svg", name: "Magma Veins",  rewardLevel: 80,  fx: "magma" },
+    { id: "ship-portal",    file: "costume22.svg", src: "ShipSkins/costume22.svg", name: "Portal Swirl", rewardLevel: 90,  fx: "portal" },
+    { id: "ship-starfield", file: "costume13.svg", src: "ShipSkins/costume13.svg", name: "Starfield",    rewardLevel: 100, fx: "starfield" }
+  ];
+
   /* ---------- Bullet skins ---------- */
   // The skins are already drawn as a pair of bullets facing right, so they
   // are never rotated in-game.
@@ -374,5 +393,5 @@ window.DATA = (function () {
     return u.base + u.inc * (level || 0);
   }
 
-  return { GAME, ships, bullets, trails, backgrounds, powerups, achievements, tips, hud, dropIcons, SPREAD, dropPrice, DROPS, DROP_ORDER, UPGRADES, UPGRADE_ORDER, upgradePrice };
+  return { GAME, ships, rewardShips, bullets, trails, backgrounds, powerups, achievements, tips, hud, dropIcons, SPREAD, dropPrice, DROPS, DROP_ORDER, UPGRADES, UPGRADE_ORDER, upgradePrice };
 })();

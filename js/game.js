@@ -107,6 +107,43 @@ window.Game = (function () {
     ctx = canvas.getContext("2d");
     resize();
     window.addEventListener("resize", resize);
+    wireXpCheat();
+  }
+
+  /* ---------------- XP CHEAT: type "expe" on the level screen ----------------
+     Fills the XP bar all the way to level 100 (queueing every level reward),
+     so the reward track / skins can be tested without grinding. */
+  let cheatBuf = "";
+  function wireXpCheat() {
+    document.addEventListener("keydown", function (e) {
+      const ov = document.getElementById("rewards-overlay");
+      if (!ov || ov.classList.contains("hidden")) { cheatBuf = ""; return; }
+      if (/^[a-z]$/i.test(e.key)) {
+        cheatBuf = (cheatBuf + e.key.toLowerCase()).slice(-4);
+        if (cheatBuf === "expe") {
+          cheatBuf = "";
+          fillXpCheat();
+        }
+      }
+    });
+  }
+
+  function fillXpCheat() {
+    const s = SAVE.load();
+    s.xp = s.xp || { level: 1, current: 0 };
+    if (s.xp.level >= XP.MAX_LEVEL) return;
+    let total = XP.toNext(s.xp.level) - (s.xp.current || 0);
+    for (let l = s.xp.level + 1; l < XP.MAX_LEVEL; l++) total += XP.toNext(l);
+    const res = XP.gain(s, total);
+    s.pendingRewards = s.pendingRewards || [];
+    res.levelUps.forEach(function (u) {
+      const at = s.pendingRewards.findIndex(function (p) { return p.level === u.level; });
+      if (at >= 0) s.pendingRewards[at].reward += u.reward;
+      else s.pendingRewards.push({ level: u.level, reward: u.reward });
+    });
+    SAVE.save();
+    buildRewardsScreen();
+    if (window.UI && UI.notify) UI.notify("Cheat: all XP filled - Level " + s.xp.level + " reached!");
   }
 
   function resize() {
@@ -1420,6 +1457,10 @@ gun: "shotgun",
           : ' <span class="xp-tnx">(' + save.xp.current + '/' + XP.toNext(save.xp.level) + ' XP to next)</span>') +
       '</div>' +
       xpResult.levelUps.map(function (u) {
+        const rs = rewardShipAt(u.level);
+        if (rs) {
+          return '<div>Level ' + u.level + ' reward: <b>' + rs.name + '</b> skin!</div>';
+        }
         return '<div>Level ' + u.level + ' reward: <span class="money">' + UI.fmt(u.reward) + '</span></div>';
       }).join("") +
 
@@ -1494,22 +1535,30 @@ gun: "shotgun",
     let html = "";
     for (let i = 1; i <= maxShow; i++) {
       const milestone = (i % 25 === 0) ? " milestone" : "";
-      if (claimSet[i]) {
+      const skinDef = rewardShipAt(i);   // skin milestone levels show their ship
+      if (claimSet[i] !== undefined) {   // hasOwnProperty-style: LVL100 reward is $0
         html += '<div class="rw-node claim' + milestone + '" data-level="' + i + '">' +
           '<div class="rw-lvl">LVL ' + i + '</div>' +
-          '<div class="rw-icon">$</div>' +
-          '<div class="rw-amt">' + UI.fmt(claimSet[i]) + '</div>' +
+          (skinDef
+            ? '<div class="rw-icon"><img class="rw-ship" src="' + skinDef.src + '" alt=""></div>' +
+              '<div class="rw-amt">' + skinDef.name.toUpperCase() + '</div>'
+            : '<div class="rw-icon">$</div>' +
+              '<div class="rw-amt">' + UI.fmt(claimSet[i]) + '</div>') +
           '<div class="rw-tag">TAP TO CLAIM</div></div>';
       } else if (i <= lvl) {
         html += '<div class="rw-node done' + milestone + '">' +
           '<div class="rw-lvl">LVL ' + i + '</div>' +
           '<div class="rw-icon">&#10003;</div>' +
-          '<div class="rw-amt">COLLECTED</div></div>';
+          '<div class="rw-amt">' + (skinDef ? 'SKIN COLLECTED' : 'COLLECTED') + '</div></div>';
       } else {
         html += '<div class="rw-node locked' + milestone + '">' +
           '<div class="rw-lvl">LVL ' + i + '</div>' +
-          '<div class="rw-icon">$</div>' +
-          '<div class="rw-amt">' + UI.fmt(XP.rewardFor(i)) + '</div></div>';
+          (skinDef
+            ? '<div class="rw-icon"><img class="rw-ship dim" src="' + skinDef.src + '" alt=""></div>' +
+              '<div class="rw-amt">' + skinDef.name.toUpperCase() + ' SKIN</div>'
+            : '<div class="rw-icon">$</div>' +
+              '<div class="rw-amt">' + UI.fmt(XP.rewardFor(i)) + '</div>') +
+          '</div>';
       }
     }
     track.innerHTML = html;
@@ -1538,7 +1587,10 @@ gun: "shotgun",
                    : cur.toLocaleString() + ' / ' + need.toLocaleString() + ' XP') +
           '</span>' +
           '<span class="rw-xp-next">' +
-            (maxed ? '' : 'Next: LVL ' + (lvl + 1) + ' &rarr; ' + UI.fmt(nextReward) + ' reward') +
+            (maxed ? '' : 'Next: LVL ' + (lvl + 1) + ' &rarr; ' +
+              (rewardShipAt(lvl + 1)
+                ? rewardShipAt(lvl + 1).name + ' skin'
+                : UI.fmt(nextReward) + ' reward')) +
           '</span>' +
         '</div>' +
       '</div>';
@@ -1566,16 +1618,28 @@ gun: "shotgun",
     const idx = s.pendingRewards.findIndex(function (p) { return p.level === level; });
     if (idx < 0) return;
     const u = s.pendingRewards.splice(idx, 1)[0];
-    s.money += u.reward;
-    s.stats.lifetimeMoney += u.reward;
-    SAVE.save();
     el.classList.remove("claim");
     el.classList.add("done", "pop");
     el.querySelector(".rw-icon").innerHTML = "&#10003;";
-    el.querySelector(".rw-amt").textContent = "COLLECTED";
     const tag = el.querySelector(".rw-tag");
     if (tag) tag.remove();
-    if (window.SFX) SFX.coin();
+
+    const item = rewardShipAt(level);
+    if (item) {
+      // skin milestone levels unlock a ship skin instead of paying cash
+      s.owned.ship = s.owned.ship || [];
+      if (s.owned.ship.indexOf(item.id) < 0) s.owned.ship.push(item.id);
+      el.querySelector(".rw-amt").textContent = "SKIN UNLOCKED";
+      SAVE.save();
+      if (window.SFX) SFX.unlockFx();
+      if (window.UI && UI.notify) UI.notify("Level " + level + " reward unlocked: " + item.name + "!", item.src);
+    } else {
+      s.money += u.reward;
+      s.stats.lifetimeMoney += u.reward;
+      el.querySelector(".rw-amt").textContent = "COLLECTED";
+      SAVE.save();
+      if (window.SFX) SFX.coin();
+    }
     updateClaimAllButton();
     if (s.pendingRewards.length === 0) {
       document.getElementById("rewards-sub").textContent = "All rewards collected!";
@@ -1586,12 +1650,30 @@ gun: "shotgun",
     const s = SAVE.load();
     s.pendingRewards = s.pendingRewards || [];
     if (!s.pendingRewards.length) return;
+    let skinItems = null;
     s.pendingRewards.forEach(function (u) {
-      s.money += u.reward;
-      s.stats.lifetimeMoney += u.reward;
+      const item = rewardShipAt(u.level);
+      if (item) {
+        skinItems = skinItems || [];
+        if (!skinItems.some(function (x) { return x.id === item.id; })) skinItems.push(item);
+        s.owned.ship = s.owned.ship || [];
+        if (s.owned.ship.indexOf(item.id) < 0) s.owned.ship.push(item.id);
+      } else {
+        s.money += u.reward;
+        s.stats.lifetimeMoney += u.reward;
+      }
     });
     s.pendingRewards = [];
     SAVE.save();
+    if (skinItems && window.UI && UI.notify) {
+      UI.notify(
+        skinItems.length === 1
+          ? "Level " + skinItems[0].rewardLevel + " reward unlocked: " + skinItems[0].name + "!"
+          : skinItems.length + " skins unlocked: " +
+            skinItems.map(function (x) { return x.name; }).join(", ") + "!",
+        skinItems[skinItems.length - 1].src
+      );
+    }
     if (window.SFX) SFX.unlockFx();
     buildRewardsScreen();
     document.getElementById("rewards-sub").textContent = "All rewards collected!";
@@ -1800,7 +1882,12 @@ gun: "shotgun",
             }
             ctx.restore();
           }
-          drawSprite(ASSETS_SRC(p.ship), p.x, p.y, shipW, shipH, p.pitch + p.wobble);
+          const shipItem = skinItem(p.ship);
+          const hasFx = shipItem && shipItem.fx;
+          if (!hasFx) {
+            drawSprite(ASSETS_SRC(p.ship), p.x, p.y, shipW, shipH, p.pitch + p.wobble);
+          }
+          drawShipFx(p.ship, p.x, p.y, shipW, shipH, p.pitch + p.wobble, hasFx);
         }
       }
 
@@ -1874,7 +1961,7 @@ gun: "shotgun",
   /* Resolve the image source for an equipment entry. */
   function ASSETS_SRC(equipId) {
     const all =
-      DATA.ships.concat(DATA.bullets).concat(DATA.trails);
+      DATA.ships.concat(DATA.rewardShips || []).concat(DATA.bullets).concat(DATA.trails);
     const found = all.find(function (x) { return x.id === equipId; });
     return found ? found.src : "";
   }
@@ -1953,6 +2040,521 @@ gun: "shotgun",
     ctx.globalAlpha = 1;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(x1, y - 3, Math.max(0, W - x1), 6);
+    ctx.restore();
+  }
+
+  /* ---------- Animated-skin canvas effects ----------
+     Menus/shop render skins as real <img> tags, so SMIL animation plays
+     there. The game canvas paints preloaded Image objects with drawImage(),
+     which freezes an SVG at one frame - so skins flagged fx:"name" get
+     their interior effects redrawn live here instead, clipped to the exact
+     hull silhouette (Path2D accepts SVG path data directly). */
+  const SCOUT_HULL_D =
+    "M240.40845,184.18663l-8.27113,10.51761h-3.67606v-11.43662h-2.75704l-4.7993," +
+    "4.7993h-2.65493v-16.89965h2.39965l4.85035,4.85035h3.16549v-10.82395l2.96127," +
+    "-0.10211l8.88381,10.41549l21.23944,4.28873z";
+  let scoutHullPath = null;
+  // design space of the source art (viewBox minus its translate)
+  const FX_DW = 43.50001, FX_DH = 30.22535, FX_OX = -218.24999, FX_OY = -164.88734;
+  // cockpit glass ellipse (FX must not paint over it)
+  const FX_GLASS = { x: 247.91, y: 179.81, rx: 5.3, ry: 2.55 };
+  // twinkling round stars: [x, y, r, color, lo, hi, dur, begin]
+  const FX_STARS = [
+    [223, 172, .5, "#ffffff", .2, 1, 1.8, 0],
+    [227, 186, .4, "#cfe0ff", .15, 1, 2.4, 0],
+    [231, 177, .45, "#ffffff", .3, 1, 2.1, .5],
+    [238, 183, .4, "#ffe9b0", .2, .9, 1.6, .9],
+    [249, 177, .5, "#ffffff", .25, 1, 2.7, 1.2],
+    [252, 181, .4, "#cfe0ff", .2, 1, 1.9, .3],
+    [228, 190, .4, "#ffffff", .3, .95, 2.3, 1.5],
+    [235, 169, .35, "#cfe0ff", .15, .85, 2, .7],
+    [245, 187, .35, "#ffffff", .2, .9, 2.6, 1.1],
+    [255, 180, .3, "#ffe9b0", .2, .8, 1.7, .4],
+    [222, 176, .4, "#cfe0ff", .25, 1, 2.2, .2],
+    [220, 181, .35, "#ffffff", .25, .9, 1.9, 1.4],
+    [224, 182, .45, "#ffe9b0", .3, 1, 2.5, .8],
+    [226, 168, .35, "#ffffff", .2, .85, 2, 1.7],
+    [230, 172, .4, "#cfe0ff", .2, .95, 2.8, .6],
+    [229, 181, .3, "#ffffff", .15, .75, 1.5, 1.1],
+    [233, 186, .4, "#ffffff", .3, 1, 2.4, 1.9],
+    [237, 178, .35, "#cfe0ff", .2, .9, 2.1, .35],
+    [241, 180, .3, "#ffe9b0", .2, .85, 1.6, 1.3],
+    [244, 178, .35, "#ffffff", .25, .8, 2.6, .9]
+  ];
+  // 4-point sparkle flares: [x, y, size, scaleLo, scaleHi, dur, begin, color]
+  const FX_SPARKLES = [
+    [234, 173, 1.6, .5, 1.2, 3.2, 0, "#ffffff"],
+    [247, 183, 1.3, .45, 1.1, 4.1, 1.3, "#cfe0ff"],
+    [229, 186, 1.2, .45, 1, 3.7, 2.1, "#ffe9b0"],
+    [242, 177, 1.1, .4, 1, 4.5, .7, "#ffffff"]
+  ];
+  // shooting stars were removed at the player's request - the sky stays calm
+  const FX_NEBULAS = [
+    { x: 236, y: 176, r: 12, color: "58,79,154", lo: .28, hi: .48, dur: 9, begin: 0 },
+    { x: 248, y: 184, r: 9, color: "106,58,138", lo: .18, hi: .36, dur: 11, begin: 0 },
+    { x: 226, y: 182, r: 7, color: "42,106,138", lo: .18, hi: .34, dur: 7, begin: 2 }
+  ];
+
+  function skinItem(id) {
+    return DATA.ships.concat(DATA.rewardShips || []).find(function (x) { return x.id === id; });
+  }
+
+  /* The reward ship unlocked at this track level, or null if it's a cash level. */
+  function rewardShipAt(level) {
+    return (DATA.rewardShips || []).find(function (r) { return r.rewardLevel === level; }) || null;
+  }
+
+  // 0 -> 1 -> 0 triangle wave, phase-shifted, matching SMIL value loops
+  function fxPulse(t, dur, begin) {
+    return .5 - .5 * Math.cos((((t - begin) / dur) % 1) * Math.PI * 2);
+  }
+
+  function drawStarfieldFx(t) {
+    // nebula wisps: soft radial-gradient clouds breathing slowly
+    FX_NEBULAS.forEach(function (n) {
+      const a = n.lo + (n.hi - n.lo) * fxPulse(t, n.dur, n.begin);
+      const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+      g.addColorStop(0, "rgba(" + n.color + "," + a.toFixed(3) + ")");
+      g.addColorStop(1, "rgba(" + n.color + ",0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // everything below drifts slowly for parallax depth (26s loop)
+    const dp = (t % 26) / 26, dk = 1 - Math.abs(1 - 2 * dp);
+    ctx.save();
+    ctx.translate(.9 * dk, -.5 * dk);
+
+    // distant planet with crescent shading
+    ctx.globalAlpha = .85 + .15 * fxPulse(t, 5, 0);
+    ctx.fillStyle = "#e8c98a";
+    ctx.beginPath(); ctx.arc(243, 171.5, 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = .55;
+    ctx.fillStyle = "#101a3a";
+    ctx.beginPath(); ctx.arc(243.6, 171, 1.6, 0, Math.PI * 2); ctx.fill();
+
+    // twinkling round stars (kept clear of the cockpit glass)
+    FX_STARS.forEach(function (st) {
+      if (Math.pow((st[0] - FX_GLASS.x) / FX_GLASS.rx, 2) +
+          Math.pow((st[1] - FX_GLASS.y) / FX_GLASS.ry, 2) < 1) return;
+      ctx.globalAlpha = st[4] + (st[5] - st[4]) * fxPulse(t, st[6], st[7]);
+      ctx.fillStyle = st[3];
+      ctx.beginPath();
+      ctx.arc(st[0], st[1], st[2], 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // sparkle flares: 4-point diamonds that scale-twinkle
+    FX_SPARKLES.forEach(function (sp) {
+      const s = sp[2] * (sp[3] + (sp[4] - sp[3]) * fxPulse(t, sp[5], sp[6]));
+      const w = s * .22;
+      ctx.globalAlpha = .4 + .6 * fxPulse(t, sp[5], sp[6]);
+      ctx.fillStyle = sp[7];
+      ctx.beginPath();
+      ctx.moveTo(sp[0], sp[1] - s);
+      ctx.lineTo(sp[0] + w, sp[1] - w);
+      ctx.lineTo(sp[0] + s, sp[1]);
+      ctx.lineTo(sp[0] + w, sp[1] + w);
+      ctx.lineTo(sp[0], sp[1] + s);
+      ctx.lineTo(sp[0] - w, sp[1] + w);
+      ctx.lineTo(sp[0] - s, sp[1]);
+      ctx.lineTo(sp[0] - w, sp[1] - w);
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    // shooting stars removed - sky stays calm
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---------- Generic animated-skin engine ----------
+     Each reward skin's SVG carries a few SMIL effects. The tables below
+     mirror exactly those effects so the same animation plays on the game
+     canvas (menus/shop show the real SVG). Coordinates are design space;
+     the caller clips everything to the hull, then re-paints the cockpit
+     glass and nozzles on top to match the SVG layering. */
+  const FX_GLASS_D =
+    "M243.11444,179.81017c0,-1.11996 2.14872,-2.02787 4.7993,-2.02787c2.65058,0 " +
+    "4.7993,0.90791 4.7993,2.02787c0,1.11996 -2.14872,2.02787 -4.7993,2.02787c-2.65058,0 " +
+    "-4.7993,-0.90791 -4.7993,-2.02787z";
+  const FX_NOZZLE_D =
+    "M231.98415,195.11269c-1.91744,0 -3.47183,-0.22859 -3.47183,-0.51056c0,-0.28198 1.55439," +
+    "-0.51056 3.47183,-0.51056c1.91744,0 3.47183,0.22859 3.47183,0.51056c0,0.28198 -1.55439," +
+    "0.51056 -3.47183,0.51056z" +
+    "M232.08627,165.90846c-1.91744,0 -3.47183,-0.22859 -3.47183,-0.51056c0,-0.28198 1.55439," +
+    "-0.51056 3.47183,-0.51056c1.91744,0 3.47183,0.22859 3.47183,0.51056c0,0.28198 -1.55439," +
+    "0.51056 -3.47183,0.51056z" +
+    "M235.45599,191.02818c-1.91744,0 -3.47183,-0.22859 -3.47183,-0.51056c0,-0.28198 1.55439," +
+    "-0.51056 3.47183,-0.51056c1.91744,0 3.47183,0.22859 3.47183,0.51056c0,0.28198 -1.55439," +
+    "0.51056 -3.47183,0.51056z" +
+    "M235.25176,170.40142c-1.91744,0 -3.47183,-0.22859 -3.47183,-0.51056c0,-0.28198 1.55439," +
+    "-0.51056 3.47183,-0.51056c1.91744,0 3.47183,0.22859 3.47183,0.51056c0,0.28198 -1.55439," +
+    "0.51056 -3.47183,0.51056z";
+  // per-skin cockpit glass tint (most share the standard pale glass)
+  const SKIN_GLASS = {
+    neon: "#e4e7ff", prism: "#e4e7ff", circuit: "#e4e7ff", helix: "#e4e7ff",
+    scan: "#e4e7ff", ekg: "#c8ffe8", hex: "#e4e7ff", magma: "#ffd9a0", portal: "#e4e7ff"
+  };
+
+  /* Static parts for each animated skin (hull + shade colors from their SVGs).
+     When drawing the full ship procedurally, we paint these first, then effects,
+     then glass + nozzles on top. */
+  const SKIN_STATIC = {
+    neon:   { hull: "#00ff15", shade: "#00920c" },
+    prism:  { hull: null, shade: null },  // hull/shade are repainted by "cycle" effects
+    circuit:{ hull: "#0d4f2b", shade: "#093a1f" },
+    helix:  { hull: "#101828", shade: "#0a1120" },
+    scan:   { hull: "#0e5e66", shade: "#09454c" },
+    ekg:    { hull: "#0a1a14", shade: "#07120e" },
+    hex:    { hull: "#3a2a6e", shade: "#2a1d52" },
+    magma:  { hull: "#1c1b22", shade: "#131218" },
+    portal: { hull: "#141032", shade: "#0d0a22" }
+  };
+
+  const EKG_TRACE_D = "M222,180 L230,180 L233,177 L236,183 L238,172 L240,188 L242,178 L244,180 L256,180";
+  const HELIX_A_D = "M206,180 q4,-6 8,0 q4,6 8,0 q4,-6 8,0 q4,6 8,0 q4,-6 8,0 q4,6 8,0 q4,-6 8,0 q4,6 8,0";
+  const HELIX_B_D = "M206,180 q4,6 8,0 q4,-6 8,0 q4,6 8,0 q4,-6 8,0 q4,6 8,0 q4,-6 8,0 q4,6 8,0 q4,-6 8,0";
+
+  const SKIN_FX = {
+    /* chasing dashed outline around the hull silhouette */
+    neon: [
+      { k: "dash", d: SCOUT_HULL_D, w: 1.1, dash: [5, 4], off: [18, 0], dur: 1.2,
+        cols: ["#eaffea", "#7dffb0", "#eaffea"], cdur: 1.2, cap: "round" }
+    ],
+    /* hull + shade repaint themselves through a looping color cycle */
+    prism: [
+      { k: "cycle", d: SCOUT_HULL_D, stops: ["#00ff15", "#00cfff", "#ff44d9", "#ffb03a"], dur: 8 },
+      { k: "cycle", d: "M239.6033,183.53019l-7.47508,8.90777h-3.52648v-9.27767l-3.00226,0.10211l-3.62261,3.55415h-2.39941v-14.31297h2.1687l3.77086,3.6995h3.26929v-8.75877l2.88049,-0.08648l8.02879,8.82129l19.19527,3.63229z",
+        stops: ["#00920c", "#0076a3", "#a3008f", "#c96f00"], dur: 8 }
+    ],
+    /* light pulses riding circuit traces */
+    circuit: [
+      { k: "ride", pts: [[222, 172], [232, 172], [238, 178], [252, 178]], r: 1.1, fill: "#7dffb0", dur: 2.2 },
+      { k: "ride", pts: [[222, 188], [232, 188], [238, 182], [252, 182]], r: 1.1, fill: "#7dffb0", dur: 2.2, begin: .7 },
+      { k: "ride", pts: [[228, 166], [228, 174], [236, 182]], r: .9, fill: "#c9ffd4", dur: 2.2, begin: 1.4,
+        keys: [0, 1, 1, 0], kt: [0, .1, .9, 1] }
+    ],
+    /* double helix scrolling sideways every period */
+    helix: [
+      { k: "scroll", dx: 16, dur: 3, els: [
+        { p: HELIX_A_D, c: "#2fd0c0", w: 1 },
+        { p: HELIX_B_D, c: "#ff4aa0", w: 1 },
+        { l: [210, 175.5, 210, 184.5], c: "#8ab0ff", w: .6, a: .85 },
+        { l: [214, 177.8, 214, 182.2], c: "#8ab0ff", w: .6, a: .85 },
+        { l: [226, 175.5, 226, 184.5], c: "#8ab0ff", w: .6, a: .85 },
+        { l: [230, 177.8, 230, 182.2], c: "#8ab0ff", w: .6, a: .85 },
+        { l: [242, 175.5, 242, 184.5], c: "#8ab0ff", w: .6, a: .85 },
+        { l: [246, 177.8, 246, 182.2], c: "#8ab0ff", w: .6, a: .85 },
+        { l: [258, 175.5, 258, 184.5], c: "#8ab0ff", w: .6, a: .85 },
+        { l: [262, 177.8, 262, 182.2], c: "#8ab0ff", w: .6, a: .85 },
+        { x: 210, y: 180, r: .55, c: "#cfe0ff" },
+        { x: 226, y: 180, r: .55, c: "#cfe0ff" },
+        { x: 242, y: 180, r: .55, c: "#cfe0ff" },
+        { x: 258, y: 180, r: .55, c: "#cfe0ff" }
+      ] }
+    ],
+    /* bright bar sweeping across the hull and back */
+    scan: [
+      { k: "sweep", x0: 214, x1: 264, y: 160, w: 3, h: 40, fill: "#bfffff", op: .85, dur: 3 },
+      { k: "sweep", x0: 211, x1: 261, y: 160, w: 6, h: 40, fill: "#5ce8e0", op: .3, dur: 3 }
+    ],
+    /* heartbeat trace with a drawing head + traveling dot + spike flare */
+    ekg: [
+      { k: "dash", d: EKG_TRACE_D, col: "#4affaf", w: 1, dash: [12, 60], off: [72, -60], dur: 2.4, join: "round" },
+      { k: "ride", pts: [[222, 180], [230, 180], [233, 177], [236, 183], [238, 172], [240, 188], [242, 178], [244, 180], [256, 180]],
+        r: 1, fill: "#c8ffe0", dur: 2.4 },
+      { k: "dot", x: 239, y: 180, r: 3, fill: "#4affaf", keys: [0, 0, .35, 0, 0], kt: [0, .42, .5, .58, 1], dur: 2.4 },
+      { k: "dot", x: 224.6, y: 172.2, r: .55, fill: "#ff5a5a", keys: [1, .2, 1], dur: 1.2 }
+    ],
+    /* honeycomb cells lighting up in a nose-ward wave */
+    hex: [
+      { k: "poly", fill: "#b79bff", keys: [0, .9, 0], dur: 2.4, begin: 0,
+        pts: [[226, 168], [228.5, 169.4], [228.5, 172.2], [226, 173.6], [223.5, 172.2], [223.5, 169.4]] },
+      { k: "poly", fill: "#b79bff", keys: [0, .9, 0], dur: 2.4, begin: .3,
+        pts: [[232, 172], [234.5, 173.4], [234.5, 176.2], [232, 177.6], [229.5, 176.2], [229.5, 173.4]] },
+      { k: "poly", fill: "#b79bff", keys: [0, .9, 0], dur: 2.4, begin: .6,
+        pts: [[238, 170], [240.5, 171.4], [240.5, 174.2], [238, 175.6], [235.5, 174.2], [235.5, 171.4]] },
+      { k: "poly", fill: "#b79bff", keys: [0, .9, 0], dur: 2.4, begin: .9,
+        pts: [[244, 172], [246.5, 173.4], [246.5, 176.2], [244, 177.6], [241.5, 176.2], [241.5, 173.4]] },
+      { k: "poly", fill: "#b79bff", keys: [0, .9, 0], dur: 2.4, begin: 1.2,
+        pts: [[250, 174], [252.5, 175.4], [252.5, 178.2], [250, 179.6], [247.5, 178.2], [247.5, 175.4]] },
+      { k: "poly", fill: "#8f7bff", keys: [0, .7, 0], dur: 2.4, begin: .45,
+        pts: [[236, 186], [238.5, 187.4], [238.5, 190.2], [236, 191.6], [233.5, 190.2], [233.5, 187.4]] },
+      { k: "poly", fill: "#8f7bff", keys: [0, .7, 0], dur: 2.4, begin: .15,
+        pts: [[230, 188], [232.5, 189.4], [232.5, 192.2], [230, 193.6], [227.5, 192.2], [227.5, 189.4]] }
+    ],
+    /* molten cracks flickering on their own rhythms */
+    magma: [
+      { k: "stroke", pts: [[222, 170], [230, 176], [236, 174], [246, 180], [256, 178]], col: "#ff5a1e", w: 1.2, keys: [.5, 1, .7, 1, .5], dur: 2.6 },
+      { k: "stroke", pts: [[222, 190], [231, 184], [238, 186], [250, 181]], col: "#ff8a1e", w: 1, keys: [1, .55, .9, .6, 1], dur: 3.1 },
+      { k: "stroke", pts: [[228, 166], [232, 173], [230, 180]], col: "#ffb03a", w: .9, keys: [.7, 1, .5, .8, .7], dur: 2.2 },
+      { k: "stroke", pts: [[228, 194], [233, 187], [231, 181]], col: "#ffb03a", w: .9, keys: [.9, .5, 1, .6, .9], dur: 2.8 },
+      { k: "dot", x: 246, y: 180, rKeys: [1.2, .7, 1.2], rdur: 2.1, fill: "#ffe14d" }
+    ],
+    /* counter-rotating portal arms around a pulsing core */
+    portal: [
+      { k: "rot", cx: 240, cy: 180, dur: 4, paths: [
+        { p: "M240,170 Q250,174 248,183 Q246,190 238,189", c: "#7a5aff", w: 1.6, a: .9 },
+        { p: "M240,190 Q230,186 232,177 Q234,170 242,171", c: "#7a5aff", w: 1.6, a: .9 },
+        { p: "M251,178 Q252,186 244,190", c: "#b08aff", w: 1, a: .6 },
+        { p: "M229,182 Q228,174 236,170", c: "#b08aff", w: 1, a: .6 }
+      ] },
+      { k: "rot", cx: 240, cy: 180, dur: 2.6, ccw: true, paths: [
+        { p: "M240,175 Q245,178 243,183 Q241,187 237,185", c: "#4affdf", w: 1.1, a: .85 },
+        { p: "M240,185 Q235,182 237,177 Q239,173 243,175", c: "#4affdf", w: 1.1, a: .85 }
+      ] },
+      { k: "dot", x: 240, y: 180, rKeys: [2.2, 3.1, 2.2], rdur: 1.4, fill: "#e0d0ff" },
+      { k: "rot", cx: 240, cy: 180, dur: 1.8, dots: [{ x: 240, y: 172, r: .8, c: "#ffffff" }] }
+    ]
+  };
+
+  const fxPathCache = {};
+  function fxPath(d) {
+    return fxPathCache[d] || (fxPathCache[d] = new Path2D(d));
+  }
+
+  function fxLerpCol(a, b, f) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const r = Math.round(((pa >> 16) & 255) + (((pb >> 16) & 255) - ((pa >> 16) & 255)) * f);
+    const g = Math.round(((pa >> 8) & 255) + (((pb >> 8) & 255) - ((pa >> 8) & 255)) * f);
+    const bl = Math.round((pa & 255) + ((pb & 255) - (pa & 255)) * f);
+    return "rgb(" + r + "," + g + "," + bl + ")";
+  }
+
+  /* loop through color stops; the last stop equals the first for a seamless wrap */
+  function fxCycle(stops, f) {
+    const n = stops.length - 1;
+    const x = (((f % 1) + 1) % 1) * n;
+    const i = Math.min(n - 1, Math.floor(x));
+    return fxLerpCol(stops[i], stops[i + 1], x - i);
+  }
+
+  /* multi-key interpolation with optional keyTimes (mirrors SMIL values/keyTimes) */
+  function fxKeys(keys, kt, dur, begin, t) {
+    const tl = t - begin;
+    if (tl < 0) return keys[0];
+    const f = (tl % dur) / dur;
+    if (!kt) {
+      const n = keys.length - 1;
+      const x = f * n;
+      const i = Math.min(n - 1, Math.floor(x));
+      return keys[i] + (keys[i + 1] - keys[i]) * (x - i);
+    }
+    for (let i = 0; i < kt.length - 1; i++) {
+      if (f <= kt[i + 1]) {
+        const span = kt[i + 1] - kt[i];
+        const g = span > 0 ? (f - kt[i]) / span : 1;
+        return keys[i] + (keys[i + 1] - keys[i]) * Math.min(1, Math.max(0, g));
+      }
+    }
+    return keys[keys.length - 1];
+  }
+
+  /* position at fraction u along a polyline at constant speed (SMIL "paced") */
+  function fxPaced(pts, u) {
+    let total = 0;
+    const lens = [];
+    for (let i = 1; i < pts.length; i++) {
+      const len = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      lens.push(len);
+      total += len;
+    }
+    let d = u * total;
+    for (let i = 0; i < lens.length; i++) {
+      if (d <= lens[i] || i === lens.length - 1) {
+        const k = lens[i] > 0 ? d / lens[i] : 0;
+        return [
+          pts[i][0] + (pts[i + 1][0] - pts[i][0]) * k,
+          pts[i][1] + (pts[i + 1][1] - pts[i][1]) * k
+        ];
+      }
+      d -= lens[i];
+    }
+    return pts[pts.length - 1];
+  }
+
+  function fxSmooth(f) { return f * f * (3 - 2 * f); }   // soft ease-in-out
+
+  function drawTableFx(fxKey, t) {
+    const els = SKIN_FX[fxKey];
+    if (!els) return;
+    for (const el of els) {
+      switch (el.k) {
+        case "cycle":   // base shape repainted through a color cycle (Prism)
+          ctx.fillStyle = fxCycle(el.stops, t / el.dur);
+          ctx.fill(fxPath(el.d));
+          break;
+        case "dash": {  // marching dashed stroke (Neon chase, EKG head)
+          const f = ((t / el.dur) % 1 + 1) % 1;
+          ctx.setLineDash(el.dash);
+          ctx.lineDashOffset = el.off[0] + (el.off[1] - el.off[0]) * f;
+          ctx.lineWidth = el.w;
+          ctx.lineJoin = el.join || "miter";
+          ctx.lineCap = el.cap || "butt";
+          ctx.strokeStyle = el.cols ? fxCycle(el.cols, t / el.cdur) : el.col;
+          ctx.stroke(fxPath(el.d));
+          ctx.setLineDash([]);
+          break;
+        }
+        case "stroke": {  // polyline flickering through opacity keys (Magma)
+          ctx.globalAlpha = Math.min(1, Math.max(0, fxKeys(el.keys, null, el.dur, el.begin || 0, t)));
+          ctx.strokeStyle = el.col;
+          ctx.lineWidth = el.w;
+          ctx.lineJoin = "round";
+          ctx.beginPath();
+          ctx.moveTo(el.pts[0][0], el.pts[0][1]);
+          for (let i = 1; i < el.pts.length; i++) ctx.lineTo(el.pts[i][0], el.pts[i][1]);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          break;
+        }
+        case "poly": {  // filled polygon pulsing through opacity keys (Hex cells)
+          ctx.globalAlpha = Math.min(1, Math.max(0, fxKeys(el.keys, null, el.dur, el.begin || 0, t)));
+          ctx.fillStyle = el.fill;
+          ctx.beginPath();
+          ctx.moveTo(el.pts[0][0], el.pts[0][1]);
+          for (let i = 1; i < el.pts.length; i++) ctx.lineTo(el.pts[i][0], el.pts[i][1]);
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          break;
+        }
+        case "dot": {  // circle with optional radius/opacity key animation
+          let r = el.r;
+          if (el.rKeys) r = fxKeys(el.rKeys, null, el.rdur, el.rbegin || 0, t);
+          if (el.keys) {
+            ctx.globalAlpha = Math.min(1, Math.max(0, fxKeys(el.keys, el.kt, el.dur, el.begin || 0, t)));
+          }
+          ctx.fillStyle = el.fill;
+          ctx.beginPath();
+          ctx.arc(el.x, el.y, Math.max(.01, r), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          break;
+        }
+        case "ride": {  // dot riding a polyline at constant speed (Circuit, EKG)
+          const tl = t - (el.begin || 0);
+          if (tl < 0) break;
+          const pos = fxPaced(el.pts, (tl % el.dur) / el.dur);
+          if (el.kt) {
+            ctx.globalAlpha = Math.min(1, Math.max(0, fxKeys(el.keys, el.kt, el.dur, el.begin || 0, t)));
+          }
+          ctx.fillStyle = el.fill;
+          ctx.beginPath();
+          ctx.arc(pos[0], pos[1], el.r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          break;
+        }
+        case "sweep": {  // bar sweeping right then back with soft easing (Scanline)
+          const f = ((t / el.dur) % 1 + 1) % 1;
+          const u = f < .5 ? fxSmooth(f * 2) : 1 - fxSmooth((f - .5) * 2);
+          ctx.globalAlpha = el.op;
+          ctx.fillStyle = el.fill;
+          ctx.fillRect(el.x0 + (el.x1 - el.x0) * u, el.y, el.w, el.h);
+          ctx.globalAlpha = 1;
+          break;
+        }
+        case "scroll": {  // group sliding left one period per loop (Helix)
+          const f = ((t / el.dur) % 1 + 1) % 1;
+          ctx.save();
+          ctx.translate(-el.dx * f, 0);
+          for (const s of el.els) {
+            if (s.p) {
+              ctx.strokeStyle = s.c;
+              ctx.lineWidth = s.w;
+              ctx.stroke(fxPath(s.p));
+            } else if (s.l) {
+              ctx.globalAlpha = s.a != null ? s.a : 1;
+              ctx.strokeStyle = s.c;
+              ctx.lineWidth = s.w;
+              ctx.beginPath();
+              ctx.moveTo(s.l[0], s.l[1]);
+              ctx.lineTo(s.l[2], s.l[3]);
+              ctx.stroke();
+              ctx.globalAlpha = 1;
+            } else {
+              ctx.fillStyle = s.c;
+              ctx.beginPath();
+              ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+          ctx.restore();
+          break;
+        }
+        case "rot": {  // group rotating around a point (Portal arms + spark)
+          const dir = el.ccw ? -1 : 1;
+          const ang = dir * (((t / el.dur) % 1 + 1) % 1) * Math.PI * 2;
+          ctx.save();
+          ctx.translate(el.cx, el.cy);
+          ctx.rotate(ang);
+          ctx.translate(-el.cx, -el.cy);
+          if (el.paths) {
+            ctx.lineCap = "round";
+            for (const sp of el.paths) {
+              ctx.globalAlpha = sp.a != null ? sp.a : 1;
+              ctx.strokeStyle = sp.c;
+              ctx.lineWidth = sp.w;
+              ctx.stroke(fxPath(sp.p));
+            }
+            ctx.globalAlpha = 1;
+          }
+          if (el.dots) {
+            for (const d of el.dots) {
+              ctx.fillStyle = d.c;
+              ctx.beginPath();
+              ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+          ctx.restore();
+          break;
+        }
+      }
+    }
+  }
+
+  function drawShipFx(itemId, x, y, w, h, rotDeg, hasFx) {
+    const item = skinItem(itemId);
+    if (!item || !item.fx) return;
+    if (!scoutHullPath) scoutHullPath = new Path2D(SCOUT_HULL_D);
+    const t = performance.now() / 1000;
+    ctx.save();
+    ctx.translate(x, y);
+    if (rotDeg) ctx.rotate((rotDeg * Math.PI) / 180);
+    // match drawSprite: image spans -w/2..w/2 around the ship center
+    ctx.translate(-w / 2, -h / 2);
+    ctx.scale(w / FX_DW, h / FX_DH);
+    ctx.translate(FX_OX, FX_OY);
+    ctx.clip(scoutHullPath);
+
+    if (item.fx === "starfield") {
+      drawStarfieldFx(t);
+    } else {
+      // For animated skins: draw complete ship procedurally (hull, shade, effects, glass, nozzles)
+      // so there's no double-image from the static base SVG frame.
+      if (hasFx) {
+        const st = SKIN_STATIC[item.fx];
+        if (st && st.hull) {
+          ctx.fillStyle = st.hull;
+          ctx.fill(fxPath(SCOUT_HULL_D));
+        }
+        if (st && st.shade) {
+          ctx.fillStyle = st.shade;
+          ctx.fill(fxPath("M239.6033,183.53019l-7.47508,8.90777h-3.52648v-9.27767l-3.00226,0.10211l-3.62261,3.55415h-2.39941v-14.31297h2.1687l3.77086,3.6995h3.26929v-8.75877l2.88049,-0.08648l8.02879,8.82129l19.19527,3.63229z"));
+        }
+      }
+      drawTableFx(item.fx, t);
+      // glass and nozzles on top (matches SVG layering)
+      ctx.fillStyle = SKIN_GLASS[item.fx] || "#e4e7ff";
+      ctx.fill(fxPath(FX_GLASS_D));
+      ctx.fillStyle = "#3b4069";
+      ctx.fill(fxPath(FX_NOZZLE_D));
+    }
     ctx.restore();
   }
 

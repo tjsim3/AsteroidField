@@ -7,16 +7,26 @@
    Every level-up pays out a money reward. Reward tiers:
      normal level ....... small
      multiples of 5 ..... higher
-     multiples of 10 .... extra
-     multiples of 25 .... even more
-     multiples of 50 .... even more than that
-     level 100 .......... jackpot
-   ===================================================== */
+     skin levels ........ animated ship skin, no money (see below)
+     other multiples of 10 / 25 / 50 ... extra cash
+   Skin milestone levels - each unlocks one DATA.rewardShips skin:
+     10 Neon Trace, 20 Prism, 30 Circuit Flow, 40 DNA Helix,
+     50 Scanline, 60 EKG Monitor, 70 Hex Pulse, 80 Magma Veins,
+     90 Portal Swirl, 100 Starfield
+    ===================================================== */
 
 window.XP = (function () {
 
   const MAX_LEVEL = 100;
   const ACHIEVEMENT_XP = 150;   // XP per newly-unlocked achievement
+
+  /* Levels whose reward is an animated ship skin instead of money.
+     Must stay in sync with DATA.rewardShips.rewardLevel. */
+  const SKIN_LEVELS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+
+  function isSkinLevel(level) {
+    return SKIN_LEVELS.indexOf(level) > -1;
+  }
 
   /* XP needed to advance FROM this level to the next.
      Exponential curve: 100 XP for level 1->2, growing ~5.8%
@@ -28,13 +38,14 @@ window.XP = (function () {
     return Math.round(100 * Math.pow(GROWTH, level - 1));
   }
 
-  /* Money paid when REACHING this level. */
+  /* Money paid when REACHING this level. Skin milestone levels pay no
+     money - their reward is the matching ship skin (DATA.rewardShips). */
   function rewardFor(level) {
-    if (level >= MAX_LEVEL) return 10000;   // 100: jackpot
-    if (level % 50 === 0) return 5000;      // 50: even more
-    if (level % 25 === 0) return 2500;      // 25: even more
-    if (level % 10 === 0) return 1200;      // 10: extra
-    if (level % 5 === 0) return 600;        // 5: higher
+    if (isSkinLevel(level)) return 0;       // skin level: not cash
+    if (level % 50 === 0) return 5000;      // even more
+    if (level % 25 === 0) return 2500;      // even more
+    if (level % 10 === 0) return 1200;      // extra
+    if (level % 5 === 0) return 600;        // higher
     return 250;                             // every other level
   }
 
@@ -64,5 +75,5 @@ window.XP = (function () {
     return { gained: amount, levelUps: levelUps, rewardTotal: rewardTotal };
   }
 
-  return { MAX_LEVEL, ACHIEVEMENT_XP, toNext, rewardFor, runXp, gain };
+  return { MAX_LEVEL, ACHIEVEMENT_XP, SKIN_LEVELS, isSkinLevel, toNext, rewardFor, runXp, gain };
 })();

@@ -503,6 +503,40 @@ window.UI = (function () {
       g.appendChild(chips);
       box.appendChild(g);
     });
+
+    // Rewards column: skins earned on the level track, never sold in drops.
+    const rw = document.createElement("div");
+    rw.className = "coll-group";
+    const rTitle = document.createElement("h4");
+    rTitle.textContent = "Rewards";
+    rw.appendChild(rTitle);
+    const rChips = document.createElement("div");
+    rChips.className = "coll-chips";
+    (DATA.rewardShips || []).forEach(function (item) {
+      const owned = isOwned(s, "ship", item.id);
+      const chip = document.createElement("button");
+      chip.type = "button";
+      if (!owned) {
+        chip.className = "coll-chip locked";
+        chip.textContent = "?";
+        chip.title = "Locked - reach Level " + (item.rewardLevel || 100) +
+          " and claim it on the level track";
+        chip.disabled = true;
+      } else {
+        const equipped = s.equipment.ship === item.id;
+        chip.className = "coll-chip" + (equipped ? " equipped" : "");
+        chip.title = item.name + " - Level " + (item.rewardLevel || 100) +
+          " reward" + (equipped ? " (equipped)" : "");
+        chip.addEventListener("click", function () { equipSkin("ship", item); });
+        const img = document.createElement("img");
+        img.src = item.src;
+        img.alt = item.name;
+        chip.appendChild(img);
+      }
+      rChips.appendChild(chip);
+    });
+    rw.appendChild(rChips);
+    box.appendChild(rw);
   }
 
   /* Equip a skin for its category and refresh the collection ring. */

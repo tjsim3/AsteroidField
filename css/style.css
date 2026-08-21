@@ -802,6 +802,14 @@ button:focus-visible {
   margin: 3px 0;
   color: #55628f;
 }
+/* ship-skin reward shown inside a track node */
+.rw-ship {
+  width: 52px;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 0 6px rgba(143, 212, 255, 0.7));
+}
+.rw-ship.dim { opacity: 0.8; }
 .rw-amt {
   font-size: 12px;
   font-weight: 800;

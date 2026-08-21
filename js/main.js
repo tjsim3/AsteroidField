@@ -233,6 +233,54 @@ window.INPUT = { keys: {} };
     }
   });
 
+  /* ---------------- easter eggs ---------------- */
+
+  // Egg 1: the classic Konami code (up up down down left right left right
+  // B A) anywhere in the game digs $100 out of the couch cushions - once.
+  const KONAMI = ["arrowup", "arrowup", "arrowdown", "arrowdown",
+                  "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"];
+  let konamiBuf = [];
+  document.addEventListener("keydown", function (e) {
+    if (e.repeat) return;
+    const k = normalise(e);
+    if (!k) return;
+    konamiBuf.push(k);
+    if (konamiBuf.length > KONAMI.length) konamiBuf.shift();
+    if (konamiBuf.length === KONAMI.length && KONAMI.every(function (key, i) { return konamiBuf[i] === key; })) {
+      konamiBuf = [];
+      const s = SAVE.load();
+      s.eggs = s.eggs || {};
+      if (!s.eggs.konami) {
+        s.eggs.konami = true;
+        s.money += 100;
+        s.stats.lifetimeMoney += 100;
+        SAVE.save();
+        UI.updateMenuStats();
+        UI.notify("KONAMI CODE! +$100 found in the couch cushions.", null);
+        if (window.SFX) SFX.unlockFx();
+      } else {
+        UI.notify("The couch is empty. You already found the Konami cash.", null);
+      }
+    }
+  });
+
+  // Egg 2: click the menu title 10 times and it starts talking back.
+  const TITLE_SECRETS = [
+    "You found a secret: the asteroids are just rocks.",
+    "Achievement unlocked: Persistence. (Not really.)",
+    "The developer thanks you for your curiosity.",
+    "Still nothing here. Or is there?",
+    "Fine. You win. Free hugs. Redeem nowhere."
+  ];
+  let titleClicks = 0;
+  document.querySelector(".title").addEventListener("click", function () {
+    titleClicks++;
+    if (titleClicks % 10 === 0) {
+      UI.notify(TITLE_SECRETS[(titleClicks / 10 - 1) % TITLE_SECRETS.length], null);
+      if (window.SFX) SFX.click();
+    }
+  });
+
   /* ---------------- boot ---------------- */
   Game.init();
   UI.applySettings(SAVE.load().settings);
