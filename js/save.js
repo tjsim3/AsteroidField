@@ -12,6 +12,11 @@ window.SAVE = (function () {
     return {
       version: 2,            // saved-data schema; bumped when skins swap slots
       money: 0,
+      xp: {                  // experience levels (see xp.js)
+        level: 1,            // current level (1-100)
+        current: 0           // xp earned toward the next level
+      },
+      pendingRewards: [],    // level-up rewards waiting to be collected: [{level, reward}]
       equipment: {
         ship: "ship-0",
         bullet: "bullet-1",

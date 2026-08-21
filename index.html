@@ -13,30 +13,38 @@
     <section id="screen-menu" class="screen">
       <div id="menu-stars" aria-hidden="true"></div>
       <div class="menu-panel">
-        <h1 class="title">ASTEROID FIELD</h1>
-        <p class="tagline">The game of dodging asteroids!</p>
+        <header class="menu-header">
+          <h1 class="title">ASTEROID FIELD</h1>
+          <p class="tagline">The game of dodging asteroids!</p>
+        </header>
 
-        <div class="menu-buttons">
+        <div class="menu-actions">
           <button id="btn-play" class="menu-btn play-btn">PLAY</button>
-          <button id="btn-play2" class="menu-btn multi-btn">2-PLAYER</button>
-          <button id="btn-store" class="menu-btn store-btn">STORE</button>
-          <button id="btn-achievements" class="menu-btn ach-btn">ACHIEVEMENTS</button>
+          <div class="menu-secondary">
+            <button id="btn-play2" class="menu-btn multi-btn">2-PLAYER</button>
+            <button id="btn-store" class="menu-btn store-btn">STORE</button>
+            <button id="btn-achievements" class="menu-btn ach-btn">ACHIEVEMENTS</button>
+          </div>
           <button id="btn-settings" class="menu-link">Settings</button>
         </div>
 
-        <div class="menu-stats" id="menu-stats"></div>
+        <div class="menu-player">
+          <div class="menu-stats" id="menu-stats"></div>
+          <div class="menu-xp" id="menu-xp"></div>
+        </div>
 
-        <div class="tip-box" id="tip-box"></div>
-
-        <p class="how-to">
-          <strong>How to play:</strong>
-          Up / Down (or W / S) to move, Space (or Shift) to shoot.
-          Grab dollar bills (+$50), bullets and power-ups! A glowing health
-          pack flies by every 30 seconds - grab it to heal +1 (each pack
-          arrives a second later than the last).
-          Multiplayer: Player 1 = W/S + Shift &middot; Player 2 = Arrows + Space.
-        </p>
-        <p class="small-note">Tip: open Drops in the Store to collect skins, then click a collected skin to equip it.</p>
+        <footer class="menu-footer">
+          <div class="tip-box" id="tip-box"></div>
+          <p class="how-to">
+            <strong>How to play:</strong>
+            Up / Down (or W / S) to move, Space (or Shift) to shoot.
+            Grab dollar bills (+$50), bullets and power-ups! A glowing health
+            pack flies by every 30 seconds - grab it to heal +1 (each pack
+            arrives a second later than the last).
+            Multiplayer: Player 1 = W/S + Shift &middot; Player 2 = Arrows + Space.
+          </p>
+          <p class="small-note">Tip: open Drops in the Store to collect skins, then click a collected skin to equip it.</p>
+        </footer>
       </div>
     </section>
 
@@ -171,11 +179,29 @@
 
     <!-- Dramatic chest-opening reveal -->
     <div id="drop-reveal" class="reveal hidden"></div>
+
+    <!-- Level-up rewards screen (horizontal reward track).
+         Lives outside the screens so it can open from the menu too. -->
+    <div id="rewards-overlay" class="overlay hidden">
+      <div class="panel rewards-panel">
+        <h2 class="rewards-title">LEVEL REWARDS</h2>
+        <p class="rewards-sub" id="rewards-sub"></p>
+        <div class="rw-xp" id="rewards-xp"></div>
+        <div class="rewards-track-wrap" id="rewards-track-wrap">
+          <div class="rewards-track" id="rewards-track"></div>
+        </div>
+        <div class="rewards-actions">
+          <button id="btn-claim-all" class="big-btn gold-btn">CLAIM ALL</button>
+          <button id="btn-rewards-close" class="big-btn">Continue</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Plain scripts (no modules) so the game works even when opened straight from disk -->
   <script src="js/data.js"></script>
   <script src="js/save.js"></script>
+  <script src="js/xp.js"></script>
   <script src="js/assets.js"></script>
   <script src="js/effects.js"></script>
   <script src="js/sound.js"></script>

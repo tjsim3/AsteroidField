@@ -40,6 +40,7 @@ window.Game = (function () {
   let runTime = 0;
   let score = 0;
   let runCash = 0;            // money collected this run
+  let runStartAchCount = null; // achievements owned when this run began (for XP)
 
   // per-run breakdown for the game-over screen
   let runStats = {
@@ -281,6 +282,7 @@ window.Game = (function () {
     runTime = 0;
     score = 0;
     runCash = 0;
+    runStartAchCount = Object.keys(SAVE.load().achievements).length;
     runStats = {
       bulletsFired: 0,
       asteroidsDestroyed: 0,
@@ -308,6 +310,7 @@ window.Game = (function () {
 
     state = STATE.PLAYING;
     document.getElementById("gameover-overlay").classList.add("hidden");
+    document.getElementById("rewards-overlay").classList.add("hidden");
     document.getElementById("pause-overlay").classList.add("hidden");
 
     buildBackground();
@@ -316,6 +319,7 @@ window.Game = (function () {
   }
 
   function exitToMenu() {
+    document.getElementById("rewards-overlay").classList.add("hidden");
     // Roll this run's combo totals into the lifetime stats so the "total
     // combos" achievements keep progressing even when a run is quit from
     // the pause menu. On the death path gameOver() already paid the run
@@ -329,6 +333,13 @@ window.Game = (function () {
       s.stats.bestCombo = Math.max(s.stats.bestCombo || 0, runStats.maxCombo);
     }
     SAVE.save();
+
+    // Nudge the player toward the level screen if rewards are waiting.
+    const pending = (SAVE.load().pendingRewards || []).length;
+    if (pending > 0 && window.UI && UI.notify) {
+      UI.notify("You have " + pending + " unclaimed level reward" +
+        (pending > 1 ? "s" : "") + "! Click the level bar to collect.");
+    }
   }
 
   function togglePause() {
@@ -1354,6 +1365,20 @@ gun: "shotgun",
     TOTAL_ACH.forEach(function (t) {
       if (save.stats.lifetimeScore >= t[0]) UI.unlock(t[1]);
     });
+
+    // ---- Experience: run performance + achievements unlocked this run ----
+    const achNow = Object.keys(save.achievements).length;
+    const newAch = Math.max(0, achNow - (runStartAchCount != null ? runStartAchCount : achNow));
+    const gainedXp = XP.runXp(score, runTime) + newAch * XP.ACHIEVEMENT_XP;
+    const xpResult = XP.gain(save, gainedXp);
+    // Stash level-up rewards as uncollected - the player must go to the
+    // main menu, open the level screen and collect them there themselves.
+    save.pendingRewards = save.pendingRewards || [];
+    xpResult.levelUps.forEach(function (u) {
+      const at = save.pendingRewards.findIndex(function (p) { return p.level === u.level; });
+      if (at >= 0) save.pendingRewards[at].reward += u.reward;
+      else save.pendingRewards.push({ level: u.level, reward: u.reward });
+    });
     SAVE.save();
 
     // show the overlay with this run's numbers
@@ -1380,6 +1405,23 @@ gun: "shotgun",
       '<div>Total Money Earned: <span class="money">' + UI.fmt(runCash) + '</span></div>' +
       '<div>Best Score: ' + save.stats.bestScore + '</div>' +
       (newBest ? '<div class="new-best">NEW BEST SCORE!</div>' : "") +
+
+      // ---- experience earned this run ----
+      '<div class="gameover-section">Experience</div>' +
+      '<div class="xp-line">+' + gainedXp + ' XP' +
+        (newAch ? ' <span class="xp-ach">(' + newAch + ' new achievement' + (newAch > 1 ? 's' : '') + ')</span>' : '') +
+      '</div>' +
+      '<div class="xp-bar"><div class="xp-fill" style="width:' +
+        (save.xp.level >= XP.MAX_LEVEL ? 100 : Math.min(100, Math.round(100 * save.xp.current / XP.toNext(save.xp.level)))) +
+        '%"></div></div>' +
+      '<div class="xp-level">Level ' + save.xp.level +
+        (save.xp.level >= XP.MAX_LEVEL
+          ? ' - MAX LEVEL!'
+          : ' <span class="xp-tnx">(' + save.xp.current + '/' + XP.toNext(save.xp.level) + ' XP to next)</span>') +
+      '</div>' +
+      xpResult.levelUps.map(function (u) {
+        return '<div>Level ' + u.level + ' reward: <span class="money">' + UI.fmt(u.reward) + '</span></div>';
+      }).join("") +
 
       '<div class="gameover-section">Money Breakdown</div>' +
       '<div class="gameover-grid">' +
@@ -1425,7 +1467,155 @@ gun: "shotgun",
 
     state = STATE.OVER;
     document.getElementById("gameover-overlay").classList.remove("hidden");
+
     updateHUD();
+  }
+
+  /* =====================================================
+     LEVEL REWARDS SCREEN - a horizontal, Clash-Royale-style
+     reward track. Claimable levels glow gold; the player
+     taps them (or CLAIM ALL) to bank the money.
+     ===================================================== */
+  function buildRewardsScreen() {
+    const save = SAVE.load();
+    const lvl = save.xp.level || 1;
+    const pending = save.pendingRewards || [];
+    const track = document.getElementById("rewards-track");
+    const sub = document.getElementById("rewards-sub");
+
+    const claimSet = {};
+    pending.forEach(function (u) { claimSet[u.level] = u.reward; });
+
+    // Show the whole 1..100 pass track, but never past a little
+    // window beyond the player's current level.
+    const maxShow = Math.min(XP.MAX_LEVEL,
+      Math.max(lvl + 6, pending.length ? pending[pending.length - 1].level : lvl));
+
+    let html = "";
+    for (let i = 1; i <= maxShow; i++) {
+      const milestone = (i % 25 === 0) ? " milestone" : "";
+      if (claimSet[i]) {
+        html += '<div class="rw-node claim' + milestone + '" data-level="' + i + '">' +
+          '<div class="rw-lvl">LVL ' + i + '</div>' +
+          '<div class="rw-icon">$</div>' +
+          '<div class="rw-amt">' + UI.fmt(claimSet[i]) + '</div>' +
+          '<div class="rw-tag">TAP TO CLAIM</div></div>';
+      } else if (i <= lvl) {
+        html += '<div class="rw-node done' + milestone + '">' +
+          '<div class="rw-lvl">LVL ' + i + '</div>' +
+          '<div class="rw-icon">&#10003;</div>' +
+          '<div class="rw-amt">COLLECTED</div></div>';
+      } else {
+        html += '<div class="rw-node locked' + milestone + '">' +
+          '<div class="rw-lvl">LVL ' + i + '</div>' +
+          '<div class="rw-icon">$</div>' +
+          '<div class="rw-amt">' + UI.fmt(XP.rewardFor(i)) + '</div></div>';
+      }
+    }
+    track.innerHTML = html;
+
+    sub.textContent = pending.length > 0
+      ? "You reached Level " + lvl + "! Tap the glowing rewards to collect them."
+      : "Reach new levels to earn money rewards!";
+
+    // large detailed XP readout at the top of the screen
+    const cur = save.xp.current || 0;
+    const maxed = lvl >= XP.MAX_LEVEL;
+    const need = maxed ? 0 : XP.toNext(lvl);
+    const pct = maxed ? 100 : Math.min(100, Math.round(100 * cur / need));
+    const nextReward = maxed ? 0 : XP.rewardFor(lvl + 1);
+    document.getElementById("rewards-xp").innerHTML =
+      '<div class="rw-xp-badge"><span class="rw-xp-lvl">LVL</span>' +
+        '<span class="rw-xp-num">' + lvl + '</span></div>' +
+      '<div class="rw-xp-mid">' +
+        '<div class="rw-xp-bar">' +
+          '<div class="rw-xp-fill' + (maxed ? ' maxed' : '') + '" style="width:' + pct + '%"></div>' +
+          '<span class="rw-xp-pct">' + pct + '%</span>' +
+        '</div>' +
+        '<div class="rw-xp-row">' +
+          '<span class="rw-xp-have">' +
+            (maxed ? 'Maximum level reached!'
+                   : cur.toLocaleString() + ' / ' + need.toLocaleString() + ' XP') +
+          '</span>' +
+          '<span class="rw-xp-next">' +
+            (maxed ? '' : 'Next: LVL ' + (lvl + 1) + ' &rarr; ' + UI.fmt(nextReward) + ' reward') +
+          '</span>' +
+        '</div>' +
+      '</div>';
+
+    // wire each claimable node
+    Array.prototype.forEach.call(track.querySelectorAll(".rw-node.claim"), function (el) {
+      el.addEventListener("click", function () {
+        claimRewardNode(parseInt(el.getAttribute("data-level"), 10), el);
+      });
+    });
+
+    updateClaimAllButton();
+
+    // scroll the track so the first claimable node sits front and center
+    const first = track.querySelector(".rw-node.claim");
+    const wrap = document.getElementById("rewards-track-wrap");
+    if (first && wrap) {
+      wrap.scrollLeft = first.offsetLeft - wrap.clientWidth / 2 + first.offsetWidth / 2;
+    }
+  }
+
+  function claimRewardNode(level, el) {
+    const s = SAVE.load();
+    s.pendingRewards = s.pendingRewards || [];
+    const idx = s.pendingRewards.findIndex(function (p) { return p.level === level; });
+    if (idx < 0) return;
+    const u = s.pendingRewards.splice(idx, 1)[0];
+    s.money += u.reward;
+    s.stats.lifetimeMoney += u.reward;
+    SAVE.save();
+    el.classList.remove("claim");
+    el.classList.add("done", "pop");
+    el.querySelector(".rw-icon").innerHTML = "&#10003;";
+    el.querySelector(".rw-amt").textContent = "COLLECTED";
+    const tag = el.querySelector(".rw-tag");
+    if (tag) tag.remove();
+    if (window.SFX) SFX.coin();
+    updateClaimAllButton();
+    if (s.pendingRewards.length === 0) {
+      document.getElementById("rewards-sub").textContent = "All rewards collected!";
+    }
+  }
+
+  function claimAllRewards() {
+    const s = SAVE.load();
+    s.pendingRewards = s.pendingRewards || [];
+    if (!s.pendingRewards.length) return;
+    s.pendingRewards.forEach(function (u) {
+      s.money += u.reward;
+      s.stats.lifetimeMoney += u.reward;
+    });
+    s.pendingRewards = [];
+    SAVE.save();
+    if (window.SFX) SFX.unlockFx();
+    buildRewardsScreen();
+    document.getElementById("rewards-sub").textContent = "All rewards collected!";
+  }
+
+  function closeRewards() {
+    document.getElementById("rewards-overlay").classList.add("hidden");
+    // refresh the menu XP bar so its unclaimed badge stays accurate
+    if (window.UI && UI.updateMenuStats) UI.updateMenuStats();
+  }
+
+  /* Open the rewards track on demand (e.g. clicking the menu XP bar). */
+  function openRewards() {
+    buildRewardsScreen();
+    document.getElementById("rewards-overlay").classList.remove("hidden");
+  }
+
+  function updateClaimAllButton() {
+    const btn = document.getElementById("btn-claim-all");
+    if (btn) btn.disabled = (SAVE.load().pendingRewards || []).length === 0;
+  }
+
+  function unclaimedCount() {
+    return (SAVE.load().pendingRewards || []).length;
   }
 
   function fmtTime(sec) {
@@ -1923,6 +2113,10 @@ gun: "shotgun",
       return true;
     },
     isOver: function () { return state === STATE.OVER; },
-    isInGame: function () { return state === STATE.PLAYING || state === STATE.PAUSED; }
+    isInGame: function () { return state === STATE.PLAYING || state === STATE.PAUSED; },
+    claimAllRewards,
+    closeRewards,
+    openRewards,
+    unclaimedCount
   };
 })();

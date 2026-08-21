@@ -21,6 +21,22 @@ window.UI = (function () {
       '<span class="money">' + fmt(s.money) + '</span>' +
       '<span class="score">Best Score: ' + s.stats.bestScore + '</span>' +
       '<span class="ach">Achievements: ' + unlocked + '/' + DATA.achievements.length + '</span>';
+
+    // Big visual XP bar under the stats pill
+    const x = s.xp || { level: 1, current: 0 };
+    const lvl = x.level || 1;
+    const cur = x.current || 0;
+    const maxed = lvl >= XP.MAX_LEVEL;
+    const need = maxed ? 0 : XP.toNext(lvl);
+    const pct = maxed ? 100 : Math.min(100, Math.round(100 * cur / need));
+    const unclaimed = (s.pendingRewards || []).length;
+    $("menu-xp").innerHTML =
+      '<div class="menu-xp-head"' + (unclaimed > 0 ? ' title="Unclaimed rewards!"' : '') + '>' +
+        '<span class="menu-xp-level">LVL ' + lvl + '</span>' +
+        '<div class="menu-xp-bar"><div class="menu-xp-fill" style="width:' + pct + '%"></div></div>' +
+        '<span class="menu-xp-text">' + (maxed ? "MAX LEVEL" : cur + " / " + need + " XP") + '</span>' +
+        (unclaimed > 0 ? '<span class="xp-badge">' + unclaimed + '</span>' : '') +
+      '</div>';
   }
 
   /* ---------------- Pro tip bar on the main menu ---------------- */

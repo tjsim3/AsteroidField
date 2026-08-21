@@ -182,6 +182,19 @@ window.INPUT = { keys: {} };
   $("btn-over-menu").addEventListener("click", goToMenu);
   $("p2-back").addEventListener("click", goToMenu);
 
+  // Level rewards screen
+  $("btn-claim-all").addEventListener("click", function () {
+    Game.claimAllRewards();
+  });
+  $("btn-rewards-close").addEventListener("click", function () {
+    Game.closeRewards();
+  });
+
+  // Clicking the menu XP bar opens the rewards track
+  $("menu-xp").addEventListener("click", function () {
+    Game.openRewards();
+  });
+
   $("btn-retry").addEventListener("click", function () {
     fadeTransition(function () {
       Game.startRun();
